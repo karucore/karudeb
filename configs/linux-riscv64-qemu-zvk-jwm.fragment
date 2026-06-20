@@ -1,0 +1,46 @@
+# QEMU virt/JWM profile matching the karu64 Zvk bring-up policy.
+#
+# This keeps userspace Vector enabled with VLEN supplied by QEMU's CPU model,
+# disables kernel preemptive vector, and avoids vectorized usercopy noise. QEMU
+# supplies standard Zvk leaves through -cpu properties; custom Karu Keccak is
+# not modeled by stock QEMU.
+
+CONFIG_LOCALVERSION="-qemu-zvk"
+# CONFIG_LOCALVERSION_AUTO is not set
+
+CONFIG_RISCV_ISA_V=y
+CONFIG_RISCV_ISA_V_DEFAULT_ENABLE=y
+CONFIG_RISCV_ISA_V_UCOPY_THRESHOLD=2147483647
+# CONFIG_RISCV_ISA_V_PREEMPTIVE is not set
+# CONFIG_RISCV_ISA_ZBC is not set
+# CONFIG_RISCV_ISA_ZBKB is not set
+
+# Match the board benchmark policy: allow the rootfs to enable direct
+# rdcycle/rdinstret through kernel.perf_user_access=2.
+CONFIG_PERF_EVENTS=y
+CONFIG_RISCV_PMU=y
+CONFIG_RISCV_PMU_LEGACY=y
+CONFIG_RISCV_PMU_SBI=y
+
+# QEMU virt/JWM root image devices.
+CONFIG_VIRTIO=y
+CONFIG_VIRTIO_MENU=y
+CONFIG_VIRTIO_MMIO=y
+CONFIG_VIRTIO_NET=y
+CONFIG_BLOCK=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_EXT4_FS=y
+
+# Keep 9p available for quick alternative QEMU rootfs tests.
+CONFIG_NET_9P=y
+CONFIG_NET_9P_VIRTIO=y
+CONFIG_9P_FS=y
+CONFIG_9P_FS_POSIX_ACL=y
+
+# Keep kernel crypto paths off; benchmark binaries should exercise Zvk.
+# CONFIG_CRYPTO_AES_RISCV64 is not set
+# CONFIG_CRYPTO_GHASH_RISCV64 is not set
+# CONFIG_CRYPTO_SM3_RISCV64 is not set
+# CONFIG_CRYPTO_SM4_RISCV64 is not set
+# CONFIG_CRYPTO_DEV_VIRTIO is not set
+# CONFIG_CRYPTO_HW is not set

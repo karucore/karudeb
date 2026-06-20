@@ -1,0 +1,20 @@
+build/
+__pycache__/
+*.py[cod]
+*.o
+*.d
+*.tmp
+*.rsp
+*.req
+*.dis
+*.tar
+*.tar.gz
+*.tar.zst
+*.img
+*.log
+tools/pqc/mlkem/xmlkem*
+tools/pqc/mldsa/xmldsa*
+
+# assistant / non-release files (not part of the published tree)                      
+CLAUDE.md
+.claude/

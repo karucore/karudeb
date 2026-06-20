@@ -1,0 +1,105 @@
+/dts-v1/;
+
+/*
+ * karu64 Verilator/linux_tb board description for the lean RV64IMAC
+ * soft-float Linux image. The DT includes LiteEth so the same kernel can
+ * enumerate eth0 in sim and on VCU118 once the external PHY path is present.
+ */
+
+/ {
+	#address-cells = <0x02>;
+	#size-cells = <0x02>;
+	compatible = "karu,karu64-sim-rv64imac";
+	model = "karu64 sim RV64IMAC soft-float initramfs";
+
+	chosen {
+		stdout-path = "/soc/ns16550@10000000";
+		bootargs = "console=ttyS0,115200 earlycon";
+		/* linux,initrd-start/end are injected by the image build script. */
+	};
+
+	cpus {
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+		timebase-frequency = <25000000>;
+
+		cpu@0 {
+			device_type = "cpu";
+			reg = <0x00>;
+			status = "okay";
+			compatible = "riscv";
+			riscv,isa = "rv64imac_zicntr_zicsr_zifencei_zihpm";
+			riscv,isa-base = "rv64i";
+			riscv,isa-extensions = "i", "m", "a", "c",
+					       "zicntr", "zicsr", "zifencei", "zihpm";
+			mmu-type = "riscv,sv39";
+			riscv,pmpregions = <0x10>;
+			riscv,pmpgranularity = <0x04>;
+			clock-frequency = <1000000000>;
+
+			cpu_intc: interrupt-controller {
+				#address-cells = <0x02>;
+				#interrupt-cells = <0x01>;
+				interrupt-controller;
+				compatible = "riscv,cpu-intc";
+			};
+		};
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x00 0x80000000 0x00 0x02000000>;
+	};
+
+	soc {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		compatible = "simple-bus";
+		ranges;
+
+		clint@2000000 {
+			compatible = "riscv,clint0";
+			interrupts-extended = <&cpu_intc 0x03 &cpu_intc 0x07>;
+			reg = <0x00 0x02000000 0x00 0x00010000>;
+		};
+
+		plic: plic@c000000 {
+			compatible = "riscv,plic0";
+			#address-cells = <0x02>;
+			interrupts-extended = <&cpu_intc 0x0b &cpu_intc 0x09>;
+			reg = <0x00 0x0c000000 0x00 0x01000000>;
+			riscv,ndev = <0x1f>;
+			riscv,max-priority = <0x0f>;
+			#interrupt-cells = <0x01>;
+			interrupt-controller;
+		};
+
+		ns16550@10000000 {
+			compatible = "ns16550a";
+			clock-frequency = <10000000>;
+			interrupt-parent = <&plic>;
+			interrupts = <0x01>;
+			reg = <0x00 0x10000000 0x00 0x00000100>;
+			reg-shift = <0x00>;
+			reg-io-width = <0x01>;
+		};
+
+		ethernet@11001000 {
+			compatible = "litex,liteeth";
+			reg = <0x00 0x11001000 0x00 0x0000007c>,
+			      <0x00 0x11000800 0x00 0x0000000a>,
+			      <0x00 0x11010000 0x00 0x00002000>;
+			reg-names = "mac", "mdio", "buffer";
+			litex,rx-slots = <2>;
+			litex,tx-slots = <2>;
+			litex,slot-size = <2048>;
+			local-mac-address = [02 00 00 00 00 10];
+			interrupt-parent = <&plic>;
+			interrupts = <0x02>;
+		};
+	};
+
+	htif {
+		compatible = "ucb,htif0";
+	};
+};

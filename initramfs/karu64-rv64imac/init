@@ -1,0 +1,40 @@
+#!/bin/sh
+# karu64 rv64imac soft-float initramfs PID 1
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export TERM=dumb
+
+/bin/busybox mount -t proc     proc /proc 2>/dev/null
+/bin/busybox mount -t sysfs    sys  /sys  2>/dev/null
+/bin/busybox mount -t devtmpfs dev  /dev  2>/dev/null
+/bin/busybox mount -t tmpfs    tmp  /tmp  2>/dev/null
+/bin/busybox mount -t tmpfs    run  /run  2>/dev/null
+
+for spec in "console c 5 1 600" "tty c 5 0 666" "ttyS0 c 4 64 600" "null c 1 3 666"; do
+	set -- $spec
+	[ -e "/dev/$1" ] || /bin/busybox mknod -m "$5" "/dev/$1" "$2" "$3" "$4"
+done
+
+/bin/busybox --install -s / 2>/dev/null
+
+echo
+echo "  ================================================"
+echo "   karu64 : rv64imac soft-float Linux bring-up"
+echo "  ================================================"
+/bin/busybox | /bin/busybox sed -n '1p'
+echo "   kernel : $(uname -srm)"
+
+ip link set lo up 2>/dev/null || true
+if [ -d /sys/class/net/eth0 ]; then
+	echo "   eth0   : present"
+	ip link set eth0 up 2>/dev/null || ifconfig eth0 up 2>/dev/null || true
+	udhcpc -i eth0 -q -n -t 2 -T 3 2>/dev/null || true
+	ip addr show eth0 2>/dev/null || ifconfig eth0 2>/dev/null || true
+else
+	echo "   eth0   : not present"
+fi
+
+echo "   try    : cat /proc/cpuinfo ; free ; /opt/tests/hello-static"
+echo
+
+exec </dev/console >/dev/console 2>&1
+exec /bin/busybox setsid /bin/busybox cttyhack /bin/sh

@@ -1,0 +1,31 @@
+#!/bin/sh
+# Minimal udhcpc hook for the karu64 initramfs.
+
+[ -n "$interface" ] || exit 0
+
+case "$1" in
+	deconfig)
+		ip addr flush dev "$interface" 2>/dev/null || ifconfig "$interface" 0.0.0.0 2>/dev/null || true
+		;;
+	renew|bound)
+		ip addr flush dev "$interface" 2>/dev/null || true
+		if [ -n "$ip" ]; then
+			if [ -n "$subnet" ]; then
+				ip addr add "$ip/$subnet" dev "$interface" 2>/dev/null || ifconfig "$interface" "$ip" netmask "$subnet" 2>/dev/null || true
+			else
+				ip addr add "$ip/24" dev "$interface" 2>/dev/null || ifconfig "$interface" "$ip" 2>/dev/null || true
+			fi
+		fi
+		ip link set "$interface" up 2>/dev/null || ifconfig "$interface" up 2>/dev/null || true
+		if [ -n "$router" ]; then
+			for r in $router; do
+				ip route add default via "$r" dev "$interface" 2>/dev/null || route add default gw "$r" "$interface" 2>/dev/null || true
+				break
+			done
+		fi
+		: > /etc/resolv.conf
+		for ns in $dns; do
+			echo "nameserver $ns" >> /etc/resolv.conf
+		done
+		;;
+esac

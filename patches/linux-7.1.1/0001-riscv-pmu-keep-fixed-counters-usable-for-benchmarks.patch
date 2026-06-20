@@ -1,0 +1,77 @@
+diff --git a/drivers/perf/riscv_pmu_sbi.c b/drivers/perf/riscv_pmu_sbi.c
+--- a/drivers/perf/riscv_pmu_sbi.c
++++ b/drivers/perf/riscv_pmu_sbi.c
+@@ -100,6 +100,23 @@
+ /* Cache the available counters in a bitmask */
+ static unsigned long cmask;
+ 
++#define RISCV_PMU_FIXED_CTR_MASK	(BIT(CSR_CYCLE - CSR_CYCLE) | \
++					 BIT(CSR_INSTRET - CSR_CYCLE))
++
++static bool pmu_sbi_is_fixed_hw_event(u32 event_idx)
++{
++	const u32 cycles = (SBI_PMU_EVENT_TYPE_HW << 16) |
++			   SBI_PMU_HW_CPU_CYCLES;
++	const u32 instructions = (SBI_PMU_EVENT_TYPE_HW << 16) |
++				 SBI_PMU_HW_INSTRUCTIONS;
++
++	/*
++	 * cycle/instret are architectural fixed counters. Karu benchmark
++	 * binaries read them directly from userspace after perf_user_access=2.
++	 */
++	return event_idx == cycles || event_idx == instructions;
++}
++
+ static int pmu_event_find_cache(u64 config);
+ struct sbi_pmu_event_data {
+ 	union {
+@@ -364,6 +381,9 @@
+ {
+ 	struct sbiret ret;
+ 
++	if (pmu_sbi_is_fixed_hw_event(edata->event_idx))
++		return;
++
+ 	ret = sbi_ecall(SBI_EXT_PMU, SBI_EXT_PMU_COUNTER_CFG_MATCH,
+ 			0, cmask, 0, edata->event_idx, 0, 0);
+ 	if (!ret.error) {
+@@ -421,7 +441,15 @@
+ 	case PERF_TYPE_HARDWARE:
+ 		if (config >= PERF_COUNT_HW_MAX)
+ 			return -EINVAL;
+-		ret = pmu_hw_event_map[config].event_idx;
++		if (config == PERF_COUNT_HW_CPU_CYCLES) {
++			ret = (SBI_PMU_EVENT_TYPE_HW << 16) |
++			      SBI_PMU_HW_CPU_CYCLES;
++		} else if (config == PERF_COUNT_HW_INSTRUCTIONS) {
++			ret = (SBI_PMU_EVENT_TYPE_HW << 16) |
++			      SBI_PMU_HW_INSTRUCTIONS;
++		} else {
++			ret = pmu_hw_event_map[config].event_idx;
++		}
+ 		break;
+ 	case PERF_TYPE_HW_CACHE:
+ 		ret = pmu_event_find_cache(config);
+@@ -899,12 +927,21 @@
+ 
+ static inline void pmu_sbi_stop_all(struct riscv_pmu *pmu)
+ {
++	unsigned long stop_mask = pmu->cmask & ~RISCV_PMU_FIXED_CTR_MASK;
++
++	if (!stop_mask)
++		return;
++
+ 	/*
+ 	 * No need to check the error because we are disabling all the counters
+ 	 * which may include counters that are not enabled yet.
++	 *
++	 * Do not stop cycle/instret here. Linux's RISC-V PMU bring-up uses this
++	 * path before userspace runs; stopping the architectural fixed counters
++	 * leaves direct rdcycle/rdinstret benchmark reads legal but frozen.
+ 	 */
+ 	sbi_ecall(SBI_EXT_PMU, SBI_EXT_PMU_COUNTER_STOP,
+-		  0, pmu->cmask, SBI_PMU_STOP_FLAG_RESET, 0, 0, 0);
++		  0, stop_mask, SBI_PMU_STOP_FLAG_RESET, 0, 0, 0);
+ }
+ 
+ static inline void pmu_sbi_stop_hw_ctrs(struct riscv_pmu *pmu)
