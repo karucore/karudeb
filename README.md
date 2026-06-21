@@ -140,12 +140,16 @@ Defaults:
 - Output directory: `build/rootfs`
 - Init: `sysvinit`
 - Serial console: `ttyS0` at `115200`
+- Locale: `C.UTF-8`
 - Root password: `root`
+- Normal lab user: `karu` with UID/GID `1000`, password `karu`, and password
+  sudo access
 - Serial autologin: enabled for lab bring-up
 - SSH server: OpenSSH with normal `ssh`, `scp`, and `sftp`
 - SSH password logins: disabled; use `authorized_keys`
 - Lab SSH client key: `configs/ssh/karudeb_lab_ed25519`; its public key
-  `configs/ssh/karudeb_lab_ed25519.pub` is installed as `authorized_keys`
+  `configs/ssh/karudeb_lab_ed25519.pub` is installed as `authorized_keys` for
+  both `root` and `karu`
 - Lab SSH host key: `configs/ssh/karudeb_host_ed25519_key`, installed as
   `/etc/ssh/ssh_host_ed25519_key`
 - Benchmark counters: direct RISC-V `rdcycle`/`rdinstret` enabled when the
@@ -266,6 +270,12 @@ The default root password hash is for the lab password `root`; override
 `ROOT_PASSWORD_HASH='*'` to lock the account, or set
 `KARUDEB_SHADOW_LAST_CHANGE` if you want normal shadow password aging instead
 of the default no-aging value used for no-RTC boards.
+The default `karu` password hash is for the lab password `karu`; override
+`KARUDEB_USER_PASSWORD_HASH='*'` to lock password authentication for that
+account while keeping SSH key login.
+The default locale is `C.UTF-8` to keep Perl and other locale-aware tools quiet
+without installing generated locale data; override `KARUDEB_LOCALE` if a target
+needs a different locale.
 The default lab SSH client and host private keys are committed under
 `configs/ssh` for repeatable local images. The private client key is not copied
 into the image; its public key becomes `authorized_keys`. Override

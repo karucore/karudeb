@@ -12,6 +12,7 @@ MIRROR="${MIRROR:-http://deb.debian.org/debian}"
 VARIANT="${VARIANT:-minbase}"
 ROOTFS_DIR="${ROOTFS_DIR:-$PROJECT_ROOT/build/rootfs}"
 KARUDEB_HOSTNAME="${KARUDEB_HOSTNAME:-karudeb}"
+KARUDEB_LOCALE="${KARUDEB_LOCALE:-C.UTF-8}"
 SERIAL_DEVICE="${SERIAL_DEVICE:-ttyS0}"
 SERIAL_SPEED="${SERIAL_SPEED:-115200}"
 SERIAL_TERM="${SERIAL_TERM:-vt100}"
@@ -21,6 +22,11 @@ KARUDEB_SSH_AUTHORIZED_KEYS="${KARUDEB_SSH_AUTHORIZED_KEYS-$PROJECT_ROOT/configs
 KARUDEB_SSH_HOST_ED25519_KEY="${KARUDEB_SSH_HOST_ED25519_KEY-$PROJECT_ROOT/configs/ssh/karudeb_host_ed25519_key}"
 ROOT_PASSWORD_HASH_DEFAULT='$6$karudeb$wg24N/PgXN56c2ju.ly3V3N1msPKMvRj24qx2yED.LbervC5Z0a98CBh0l2V2BX4SfMXhUFzmUrVjV60sylnx0'
 ROOT_PASSWORD_HASH="${ROOT_PASSWORD_HASH:-$ROOT_PASSWORD_HASH_DEFAULT}"
+KARUDEB_USER="${KARUDEB_USER:-karu}"
+KARUDEB_USER_UID="${KARUDEB_USER_UID:-1000}"
+KARUDEB_USER_GID="${KARUDEB_USER_GID:-1000}"
+KARUDEB_USER_PASSWORD_HASH_DEFAULT='$6$karu$WP5yVp50lS8TYvEKw8DU0SvciZFpLc1ZofGYqcAU5RLA1RjOalXURWIhWnUdmta/U29spcnO5bxirOUecnWwx/'
+KARUDEB_USER_PASSWORD_HASH="${KARUDEB_USER_PASSWORD_HASH:-$KARUDEB_USER_PASSWORD_HASH_DEFAULT}"
 KARUDEB_SHADOW_LAST_CHANGE="${KARUDEB_SHADOW_LAST_CHANGE:-}"
 ROOTFS_BUILDER="${ROOTFS_BUILDER:-auto}"
 MMDEBSTRAP_USE_SUDO="${MMDEBSTRAP_USE_SUDO:-0}"
@@ -50,7 +56,7 @@ KARUDEB_TARGET_STATIC="${KARUDEB_TARGET_STATIC:-0}"
 KARUDEB_OPENSSL_ZVK_BENCH="${KARUDEB_OPENSSL_ZVK_BENCH:-1}"
 KARUDEB_OPENSSL_ZVK_KAT="${KARUDEB_OPENSSL_ZVK_KAT:-1}"
 
-DEFAULT_PACKAGES="sysvinit-core,sysv-rc,ifupdown,iproute2,netbase,openssh-server,procps,psmisc,iputils-ping,ca-certificates,busybox-static"
+DEFAULT_PACKAGES="sysvinit-core,sysv-rc,ifupdown,iproute2,netbase,openssh-server,sudo,procps,psmisc,iputils-ping,ca-certificates,busybox-static"
 VNC_PACKAGES="tigervnc-standalone-server,tigervnc-common,tigervnc-tools,jwm,xterm,xauth,x11-xserver-utils,fonts-dejavu-core"
 PACKAGES="${PACKAGES:-$DEFAULT_PACKAGES}"
 if [[ "$KARUDEB_JWM_VNC" == "1" ]]; then
@@ -185,8 +191,10 @@ configure_built_rootfs() {
         install -m 0644 "$host_pub" "$staged_ssh_host_pub"
         KARUDEB_SSH_HOST_ED25519_KEY="$staged_ssh_host_key"
       fi
-      export ARCH SUITE ROOTFS_DIR KARUDEB_HOSTNAME SERIAL_DEVICE SERIAL_SPEED SERIAL_TERM
-      export SERIAL_AUTOLOGIN ROOT_SSH_AUTHORIZED_KEYS KARUDEB_SSH_AUTHORIZED_KEYS KARUDEB_SSH_HOST_ED25519_KEY ROOT_PASSWORD_HASH KARUDEB_SHADOW_LAST_CHANGE ROOTFS_CONFIGURE_ONLY=1
+      export ARCH SUITE ROOTFS_DIR KARUDEB_HOSTNAME KARUDEB_LOCALE SERIAL_DEVICE SERIAL_SPEED SERIAL_TERM
+      export SERIAL_AUTOLOGIN ROOT_SSH_AUTHORIZED_KEYS KARUDEB_SSH_AUTHORIZED_KEYS KARUDEB_SSH_HOST_ED25519_KEY
+      export ROOT_PASSWORD_HASH KARUDEB_USER KARUDEB_USER_UID KARUDEB_USER_GID KARUDEB_USER_PASSWORD_HASH
+      export KARUDEB_SHADOW_LAST_CHANGE ROOTFS_CONFIGURE_ONLY=1
       export KARUDEB_BUSYBOX_RESCUE
       export KARUDEB_CONFIGURE_IN_USERNS=1
       export KARUDEB_JWM_VNC KARUDEB_VNC_USER KARUDEB_VNC_UID KARUDEB_VNC_GID
@@ -351,6 +359,7 @@ PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin prohibit-password
 UseDNS no
+SetEnv LANG=$KARUDEB_LOCALE
 EOF
 
   rootfs_cmd rm -f "$ROOTFS_DIR/etc/rc2.d/S99dropbear" \
@@ -644,6 +653,34 @@ ensure_local_user() {
 
   rootfs_cmd install -d -m 0755 "$ROOTFS_DIR/$home"
   rootfs_chown "$uid:$gid" "$ROOTFS_DIR/$home"
+}
+
+set_local_user_password() {
+  local user="$1"
+  local hash="$2"
+  local tmp
+
+  tmp="$(mktemp)"
+  awk -F: -v OFS=: -v user="$user" -v hash="$hash" \
+    -v last_change="$KARUDEB_SHADOW_LAST_CHANGE" \
+    '$1 == user {$2 = hash; $3 = last_change} {print}' \
+    "$ROOTFS_DIR/etc/shadow" >"$tmp"
+  rootfs_cmd install -D -m 0640 "$tmp" "$ROOTFS_DIR/etc/shadow"
+  rm -f "$tmp"
+}
+
+configure_karudeb_user() {
+  local keys="$1"
+
+  ensure_local_user "$KARUDEB_USER" "$KARUDEB_USER_UID" "$KARUDEB_USER_GID" \
+    "Karu User" "/home/$KARUDEB_USER" "/bin/bash"
+  set_local_user_password "$KARUDEB_USER" "$KARUDEB_USER_PASSWORD_HASH"
+  install_authorized_keys "$KARUDEB_USER" "/home/$KARUDEB_USER" \
+    "$KARUDEB_USER_UID" "$KARUDEB_USER_GID" "$keys"
+
+  write_rootfs_file "etc/sudoers.d/karudeb-$KARUDEB_USER" 0440 <<EOF
+$KARUDEB_USER ALL=(ALL:ALL) ALL
+EOF
 }
 
 enable_sysv_service() {
@@ -963,8 +1000,20 @@ build_with_debootstrap() {
   as_root chroot "$ROOTFS_DIR" "/usr/bin/$(basename "$qemu_bin")" /bin/sh /debootstrap/debootstrap --second-stage
 }
 
+configure_locale() {
+  write_rootfs_file etc/default/locale <<EOF
+LANG=$KARUDEB_LOCALE
+EOF
+
+  write_rootfs_file etc/environment <<EOF
+LANG=$KARUDEB_LOCALE
+EOF
+}
+
 configure_rootfs() {
   local shared_ssh_authorized_keys
+
+  shared_ssh_authorized_keys="${KARUDEB_SSH_AUTHORIZED_KEYS:-$ROOT_SSH_AUTHORIZED_KEYS}"
 
   write_rootfs_file etc/hostname <<EOF
 $KARUDEB_HOSTNAME
@@ -999,6 +1048,7 @@ tmpfs     /tmp   tmpfs    nosuid,nodev,size=512M        0  0
 EOF
 
   configure_busybox_rescue_init
+  configure_locale
   configure_rcs
   configure_openssh
   configure_init_tmpfs_helpers
@@ -1006,6 +1056,7 @@ EOF
   configure_perf_run
   configure_openssl_zvk_bench
   configure_openssl_zvk_kat
+  configure_karudeb_user "$shared_ssh_authorized_keys"
 
   write_rootfs_file etc/apt/apt.conf.d/99karudeb-no-recommends <<'EOF'
 Apt::Install-Recommends "false";
@@ -1048,7 +1099,6 @@ EOF
   ensure_securetty
   replace_root_shadow
 
-  shared_ssh_authorized_keys="${KARUDEB_SSH_AUTHORIZED_KEYS:-$ROOT_SSH_AUTHORIZED_KEYS}"
   rootfs_cmd install -d -m 0755 "$ROOTFS_DIR/root"
   install_authorized_keys root /root 0 0 "${ROOT_SSH_AUTHORIZED_KEYS:-$shared_ssh_authorized_keys}"
   if [[ "$KARUDEB_JWM_VNC" == "1" ]]; then

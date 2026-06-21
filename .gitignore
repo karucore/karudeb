@@ -14,7 +14,3 @@ __pycache__/
 *.log
 tools/pqc/mlkem/xmlkem*
 tools/pqc/mldsa/xmldsa*
-
-# assistant / non-release files (not part of the published tree)                      
-CLAUDE.md
-.claude/

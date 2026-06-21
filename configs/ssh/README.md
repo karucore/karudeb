@@ -5,7 +5,8 @@ stores private-key files as normal non-executable files; image builds install
 the sensitive target-side files with restrictive permissions.
 
 - `karudeb_lab_ed25519`: client key kept in the repo for lab access.
-- `karudeb_lab_ed25519.pub`: installed as `authorized_keys` with mode `0600`.
+- `karudeb_lab_ed25519.pub`: installed as `authorized_keys` for `root` and
+  `karu` with mode `0600`.
 - `karudeb_host_ed25519_key`: installed as `/etc/ssh/ssh_host_ed25519_key` with mode `0600`.
 
 Fingerprints:
