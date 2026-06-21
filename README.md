@@ -791,15 +791,16 @@ and sim DTBs advertise the default full-vector karu64 profile:
 The legacy `riscv,isa` string also carries `zvl256b` for tools that consume it.
 Linux 7.1.1 does not accept `zvl*` in `riscv,isa-extensions`; it probes the
 actual vector length from the vector CSRs. The default DTBs intentionally do not
-advertise `zkt`, M-mode pointer masking `smmpm`, opt-in `zvkb`/`zvk*`, full
-`zvfh`, `zvbb`, or `zvbc`.
+advertise M-mode pointer masking `smmpm`, opt-in `zvkb`/`zvk*`, DIEL assertions
+`zkt`/`zvkt`, full `zvfh`, `zvbb`, or `zvbc`.
 
 The `zvk-ddr` DTB variant advertises the implemented standard Zvk leaves
-(`zvkb`, `zvkg`, `zvkned`, `zvknha`, `zvknhb`, `zvksed`, `zvksh`) plus
-`smcntrpmf` and `sscofpmf`. Linux 7.1.1 uses `sscofpmf` for PMU overflow
-support and silently ignores the `smcntrpmf` token; OpenSBI consumes the same
-structured list and probes the CSRs before programming counter filters for
-perf events such as `instructions:u`.
+(`zvkb`, `zvkg`, `zvkned`, `zvknha`, `zvknhb`, `zvksed`, `zvksh`) plus the
+scalar and vector data-independent execution latency assertions `zkt` and
+`zvkt`, and `smcntrpmf`/`sscofpmf`. Linux 7.1.1 uses `sscofpmf` for PMU
+overflow support and silently ignores the `smcntrpmf` token; OpenSBI consumes
+the same structured list and probes the CSRs before programming counter
+filters for perf events such as `instructions:u`.
 Hardware boot validation confirmed these tokens in
 `/proc/device-tree/cpus/cpu@0/riscv,isa-extensions`.
 `smstateen`/`ssstateen` are intentionally not advertised for the release
