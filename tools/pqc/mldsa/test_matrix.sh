@@ -1,4 +1,4 @@
-#1/bin/bash
+#!/bin/bash
 
 make obj-clean
 make VK_KECCAK=0 MLDSA_RVV=0 RVKISA=rv64gc
