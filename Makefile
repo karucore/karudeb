@@ -8,7 +8,7 @@ help:
 	@printf '%s\n' 'Targets:'
 	@printf '  %-12s %s\n' clean 'remove local caches, PQC outputs, and QEMU logs'
 	@printf '  %-12s %s\n' distclean 'remove build/ as well'
-	@printf '  %-12s %s\n' kernel-qemu 'fetch/build Linux 7.1.1 QEMU kernel'
+	@printf '  %-12s %s\n' kernel-qemu 'fetch/build Linux 7.1.2 QEMU kernel'
 	@printf '  %-12s %s\n' karu-opensbi 'build generic karu64 OpenSBI fw_jump'
 	@printf '  %-12s %s\n' karu64-rv64imac-dtb 'build reduced RV64IMAC ROM control DTB'
 	@printf '  %-12s %s\n' karu64-rv64gc-linux 'build scalar RV64GC NFS-root kernel'

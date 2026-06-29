@@ -209,7 +209,7 @@ That path opens per-process cycle and instruction events with
 `exclude_kernel=1`; on Smcntrpmf/Sscofpmf hardware, OpenSBI is responsible for
 programming the privilege-mode counter filters.
 
-Hardware sanity check from a full-vector bitstream (`7.1.1-zvk`, VLEN=256,
+Hardware sanity check from a full-vector bitstream (`7.1.2-zvk`, VLEN=256,
 Zvk+Keccak, Smcntrpmf/Sscofpmf advertised in the live DTB):
 
 ```sh
@@ -368,8 +368,8 @@ The generated kernel image is usually:
 build/linux-riscv64/arch/riscv/boot/Image
 ```
 
-The QEMU wrapper fetches and verifies Linux 7.1.1 under
-`build/kernel-source/linux-7.1.1` if the source tree is missing.
+The QEMU wrapper fetches and verifies Linux 7.1.2 under
+`build/kernel-source/linux-7.1.2` if the source tree is missing.
 
 By default this builds only `Image`. Set `BUILD_TARGETS='Image modules dtbs'`
 if you also need a module tree or board DTBs.
@@ -789,7 +789,7 @@ and sim DTBs advertise the default full-vector karu64 profile:
 - vector subsets `zve32x`, `zve32f`, `zve64x`, `zve64f`, `zve64d`, `zvfhmin`
 
 The legacy `riscv,isa` string also carries `zvl256b` for tools that consume it.
-Linux 7.1.1 does not accept `zvl*` in `riscv,isa-extensions`; it probes the
+Linux 7.1.2 does not accept `zvl*` in `riscv,isa-extensions`; it probes the
 actual vector length from the vector CSRs. The default DTBs intentionally do not
 advertise M-mode pointer masking `smmpm`, opt-in `zvkb`/`zvk*`, DIEL assertions
 `zkt`/`zvkt`, full `zvfh`, `zvbb`, or `zvbc`.
@@ -797,7 +797,7 @@ advertise M-mode pointer masking `smmpm`, opt-in `zvkb`/`zvk*`, DIEL assertions
 The `zvk-ddr` DTB variant advertises the implemented standard Zvk leaves
 (`zvkb`, `zvkg`, `zvkned`, `zvknha`, `zvknhb`, `zvksed`, `zvksh`) plus the
 scalar and vector data-independent execution latency assertions `zkt` and
-`zvkt`, and `smcntrpmf`/`sscofpmf`. Linux 7.1.1 uses `sscofpmf` for PMU
+`zvkt`, and `smcntrpmf`/`sscofpmf`. Linux 7.1.2 uses `sscofpmf` for PMU
 overflow support and silently ignores the `smcntrpmf` token; OpenSBI consumes
 the same structured list and probes the CSRs before programming counter
 filters for perf events such as `instructions:u`.
@@ -858,7 +858,7 @@ make karu-rv64imac-tftp
 
 The configuration sources are:
 
-- `configs/linux-riscv64-karu64-rv64imac.fragment` for Linux 7.1.1 with
+- `configs/linux-riscv64-karu64-rv64imac.fragment` for Linux 7.1.2 with
   `CONFIG_FPU` off and the built-in LiteEth driver.
 - `configs/busybox-karu64-rv64imac.fragment` for static rv64imac/lp64
   BusyBox plus basic network applets.
