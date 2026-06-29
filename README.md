@@ -398,6 +398,15 @@ The karu64 VCU118 netboot convention used by the release Zvk board image is:
 - NFS export clients: `192.168.42.0/24`
 - NFS root path: `/srv/nfs/karudeb`
 
+If the host-side board Ethernet is configured manually, a host reboot may drop
+the `192.168.42.1/24` address even though NFS/TFTP services and exports remain
+enabled. Restore it on the board-facing interface before booting hardware:
+
+```sh
+sudo ip addr replace 192.168.42.1/24 dev <board-ethernet-iface>
+sudo ip link set <board-ethernet-iface> up
+```
+
 Export the rootfs:
 
 ```sh
@@ -412,7 +421,7 @@ If the rootfs was built rootless, extract `build/karudeb-riscv64-rootfs.tar.zst`
 as root into `/srv/nfs/karudeb` first, then export that directory:
 
 ```sh
-DEST=/srv/nfs/karudeb ./scripts/install-nfs-root.sh
+FORCE=1 DEST=/srv/nfs/karudeb ./scripts/install-nfs-root.sh
 ROOTFS_DIR=/srv/nfs/karudeb \
 CLIENT_CIDR=192.168.42.0/24 \
 ./scripts/export-nfs-root.sh
@@ -721,7 +730,7 @@ FORCE=1 \
 ./scripts/build-rootfs.sh
 ./scripts/package-rootfs.sh
 
-DEST=/srv/nfs/karudeb ./scripts/install-nfs-root.sh
+FORCE=1 DEST=/srv/nfs/karudeb ./scripts/install-nfs-root.sh
 ROOTFS_DIR=/srv/nfs/karudeb \
 CLIENT_CIDR=192.168.42.0/24 \
 ./scripts/export-nfs-root.sh
@@ -743,6 +752,13 @@ make karu64-zvk-tftp
 The generated `build/karu64/tftp/zvk-ddr/uboot-netboot-one-line.txt` is the
 default `VCU118_NETBOOT_FILE_VEC` input consumed by `../karu64` when building
 the vector ROM board image.
+
+A VCU118 hardware boot validation on 2026-06-29 confirmed the rebuilt release
+path end to end: U-Boot fetched the staged `Image` and `board.dtb` from
+`192.168.42.1`, Linux booted as `7.1.2-zvk`, configured `eth0` as
+`192.168.42.10/24`, mounted `/srv/nfs/karudeb` as NFS root, entered runlevel 2,
+applied the benchmark counter sysctls, started `sshd`, and reached the
+`root@karudeb` shell.
 
 For scalar RV64GC control builds:
 
