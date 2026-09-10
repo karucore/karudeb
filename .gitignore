@@ -12,5 +12,3 @@ __pycache__/
 *.tar.zst
 *.img
 *.log
-tools/pqc/mlkem/xmlkem*
-tools/pqc/mldsa/xmldsa*

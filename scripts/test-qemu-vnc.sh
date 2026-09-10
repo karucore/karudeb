@@ -30,6 +30,7 @@ MEMORY="${MEMORY:-2G}"
 SMP="${SMP:-1}"
 QEMU_MACHINE="${QEMU_MACHINE:-virt}"
 QEMU_CPU="${QEMU_CPU:-rv64,v=true,vlen=256,elen=64}"
+QEMU_SYSTEM="${QEMU_SYSTEM:-qemu-system-riscv64}"
 QEMU_BIOS="${QEMU_BIOS:-default}"
 QEMU_NET_DEVICE="${QEMU_NET_DEVICE:-virtio-net-device}"
 QEMU_EXTRA_ARGS="${QEMU_EXTRA_ARGS:-}"
@@ -287,7 +288,7 @@ ensure_kernel() {
   fi
 
   if [[ "$BUILD_KERNEL_IF_MISSING" == "1" && "$KERNEL" == "$PROJECT_ROOT/build/linux-riscv64/arch/riscv/boot/Image" ]]; then
-    info "Building missing Linux 7.1.2 QEMU kernel: $KERNEL"
+    info "Building missing Linux 7.2.2 QEMU kernel: $KERNEL"
     "$SCRIPT_DIR/build-qemu-linux.sh"
   fi
 
@@ -302,7 +303,7 @@ start_qemu() {
   local extra_args=()
 
   check_tools \
-    "qemu-system-riscv64:qemu-system-misc:run RISC-V system QEMU" \
+    "$QEMU_SYSTEM:qemu-system-misc:run RISC-V system QEMU" \
     "bash:bash:probe forwarded VNC socket" \
     "timeout:coreutils:bound VNC socket probes"
 
@@ -358,7 +359,7 @@ start_qemu() {
   fi
 
   info "Starting QEMU with root image: $ROOTFS_IMAGE"
-  if ! qemu-system-riscv64 "${qemu_args[@]}" 2>"$QEMU_ERR_FILE"; then
+  if ! "$QEMU_SYSTEM" "${qemu_args[@]}" 2>"$QEMU_ERR_FILE"; then
     die "QEMU failed to start; see $QEMU_ERR_FILE"
   fi
 

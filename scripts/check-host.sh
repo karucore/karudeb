@@ -103,7 +103,7 @@ if have_cmd arch-test; then
   fi
 fi
 check_cmd tar "package rootfs archive" tar
-check_cmd curl "fetch Linux 7.1.2 source when needed" curl
+check_cmd curl "fetch Linux 7.2.2 source when needed" curl
 check_cmd sha256sum "verify downloaded Linux source tarball" coreutils
 check_cmd xz "extract Linux .tar.xz source archive" xz-utils
 check_cmd python3 "seed QEMU 9p mapped-xattr metadata" python3
@@ -115,6 +115,8 @@ check_one_of "build riscv64 target helper binaries" \
   "riscv64-linux-gnu-clang:clang" \
   "clang:clang"
 check_cmd ld.lld "link clang-built riscv64 target helpers" lld
+check_optional_one_of "cross-build the Zvknhk OpenSSL benchmark from ../riscv-pqc" \
+  "riscv64-unknown-linux-gnu-gcc:riscv-gnu-toolchain (linux, glibc)"
 check_cmd clang "build RISC-V Linux kernels with LLVM" clang
 check_cmd llvm-ar "archive RISC-V Linux kernel objects with LLVM" llvm
 check_cmd llvm-nm "inspect RISC-V Linux kernel symbols with LLVM" llvm

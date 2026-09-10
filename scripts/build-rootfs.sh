@@ -55,6 +55,8 @@ KARUDEB_TARGET_SYSROOT="${KARUDEB_TARGET_SYSROOT:-}"
 KARUDEB_TARGET_STATIC="${KARUDEB_TARGET_STATIC:-0}"
 KARUDEB_OPENSSL_ZVK_BENCH="${KARUDEB_OPENSSL_ZVK_BENCH:-1}"
 KARUDEB_OPENSSL_ZVK_KAT="${KARUDEB_OPENSSL_ZVK_KAT:-1}"
+KARUDEB_ZVKNHK_OPENSSL="${KARUDEB_ZVKNHK_OPENSSL:-1}"
+KARUDEB_ZVKNHK_DIR="${KARUDEB_ZVKNHK_DIR:-$PROJECT_ROOT/build/zvknhk}"
 
 DEFAULT_PACKAGES="sysvinit-core,sysv-rc,ifupdown,iproute2,netbase,openssh-server,sudo,procps,psmisc,iputils-ping,ca-certificates,busybox-static"
 VNC_PACKAGES="tigervnc-standalone-server,tigervnc-common,tigervnc-tools,jwm,xterm,xauth,x11-xserver-utils,fonts-dejavu-core"
@@ -204,6 +206,7 @@ configure_built_rootfs() {
       export KARUDEB_PERF_USER_ACCESS KARUDEB_PERF_EVENT_PARANOID
       export KARUDEB_PERF_RUN KARUDEB_PERF_RUN_CC KARUDEB_TARGET_CC KARUDEB_TARGET_SYSROOT KARUDEB_TARGET_STATIC
       export KARUDEB_OPENSSL_ZVK_BENCH KARUDEB_OPENSSL_ZVK_KAT
+      export KARUDEB_ZVKNHK_OPENSSL KARUDEB_ZVKNHK_DIR
       unshare --map-auto --setuid 0 --setgid 0 "$SCRIPT_DIR/build-rootfs.sh" || status=$?
       rm -f "$staged_ssh_host_key" "$staged_ssh_host_pub"
       return "$status"
@@ -599,6 +602,36 @@ configure_openssl_zvk_kat() {
     -o "$out"
   rootfs_cmd install -D -m 0755 "$out" "$ROOTFS_DIR/usr/local/bin/openssl_zvk_kat"
   rm -f "$out"
+}
+
+# The Zvknhk (vkeccak.vi) OpenSSL benchmark binaries are cross-built from the
+# ../riscv-pqc reference tree by scripts/build-zvknhk-openssl.sh and staged
+# under build/zvknhk. They are static, so the rootfs needs no development
+# packages for them. The patched openssl lives under its own prefix and does
+# not replace the Debian openssl used by openssl_zvk_bench.
+configure_zvknhk_openssl() {
+  local src
+
+  [[ "$KARUDEB_ZVKNHK_OPENSSL" == "1" ]] || return 0
+  if [[ "$ARCH" != "riscv64" ]]; then
+    info "Skipping Zvknhk OpenSSL: only riscv64 rootfs is supported"
+    return 0
+  fi
+
+  [[ -x "$KARUDEB_ZVKNHK_DIR/bin/openssl" && -x "$KARUDEB_ZVKNHK_DIR/bin/pqcbench" ]] || \
+    die "missing Zvknhk OpenSSL binaries under $KARUDEB_ZVKNHK_DIR/bin; run 'make zvknhk-openssl' (needs ../riscv-pqc) or set KARUDEB_ZVKNHK_OPENSSL=0"
+  src="$PROJECT_ROOT/tools/zvknhk_bench.sh"
+  [[ -f "$src" ]] || die "missing Zvknhk benchmark script: $src"
+
+  rootfs_cmd install -D -m 0755 "$KARUDEB_ZVKNHK_DIR/bin/openssl" \
+    "$ROOTFS_DIR/usr/local/openssl-zvknhk/bin/openssl"
+  rootfs_cmd install -D -m 0755 "$KARUDEB_ZVKNHK_DIR/bin/pqcbench" "$ROOTFS_DIR/usr/local/bin/pqcbench"
+  rootfs_cmd install -D -m 0755 "$src" "$ROOTFS_DIR/usr/local/bin/zvknhk_bench"
+  rootfs_cmd ln -sf ../openssl-zvknhk/bin/openssl "$ROOTFS_DIR/usr/local/bin/openssl-zvknhk"
+  if [[ -f "$KARUDEB_ZVKNHK_DIR/VERSION" ]]; then
+    rootfs_cmd install -D -m 0644 "$KARUDEB_ZVKNHK_DIR/VERSION" \
+      "$ROOTFS_DIR/usr/local/openssl-zvknhk/VERSION"
+  fi
 }
 
 ensure_local_user() {
@@ -1056,6 +1089,7 @@ EOF
   configure_perf_run
   configure_openssl_zvk_bench
   configure_openssl_zvk_kat
+  configure_zvknhk_openssl
   configure_karudeb_user "$shared_ssh_authorized_keys"
 
   write_rootfs_file etc/apt/apt.conf.d/99karudeb-no-recommends <<'EOF'

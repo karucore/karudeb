@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=scripts/common.sh
 source "$SCRIPT_DIR/common.sh"
 
-KERNEL_VERSION="${KERNEL_VERSION:-7.1.2}"
+KERNEL_VERSION="${KERNEL_VERSION:-7.2.2}"
 KERNEL_SERIES="${KERNEL_SERIES:-v7.x}"
 KERNEL_BASE_URL="${KERNEL_BASE_URL:-https://cdn.kernel.org/pub/linux/kernel/$KERNEL_SERIES}"
 DEST_DIR="${DEST_DIR:-$PROJECT_ROOT/build/kernel-source}"

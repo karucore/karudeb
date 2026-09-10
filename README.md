@@ -42,8 +42,8 @@ This is intentionally separate from the root-owned NFS export used for hardware.
   images.
 - `initramfs/karu64-rv64imac/`: files copied into the reduced RV64IMAC
   initramfs image.
-- `tools/`: benchmark helpers and the repo-local ML-KEM/ML-DSA sources under
-  `tools/pqc/`.
+- `tools/`: benchmark helpers installed into the rootfs, including the
+  on-target `zvknhk_bench` runner for the Zvknhk OpenSSL benchmark.
 - `patches/`: Linux patches applied by `scripts/build-linux.sh` when the source
   version matches.
 
@@ -105,6 +105,10 @@ Kernel builds prefer clang/LLVM when `clang`, `ld.lld`, and the LLVM binutils
 are in `PATH`. Set `CROSS_COMPILE=riscv64-linux-gnu-` to force a GCC cross
 compiler, or set `LLVM=1` explicitly for the kernel's LLVM build path.
 
+The Zvknhk OpenSSL benchmark binaries are cross-built from the `../riscv-pqc`
+checkout with its `riscv64-unknown-linux-gnu-` GCC toolchain (the one
+riscv-pqc itself uses); see [Zvknhk OpenSSL benchmark](#zvknhk-openssl-benchmark).
+
 For a smaller rootfs-only host, the minimum package set is:
 
 ```sh
@@ -161,6 +165,11 @@ Defaults:
 - OpenSSL RISC-V crypto benchmark suite: `/usr/local/bin/openssl_zvk_bench`,
   installed from `tools/openssl_zvk_bench.sh`, with the
   `/usr/local/bin/openssl_zvk_kat` helper for GCM/GHASH known-answer tests
+- Zvknhk OpenSSL benchmark: the static `vkeccak.vi`-patched OpenSSL at
+  `/usr/local/openssl-zvknhk/bin/openssl` (also reachable as
+  `/usr/local/bin/openssl-zvknhk`), the `/usr/local/bin/pqcbench`
+  ML-KEM/ML-DSA cycle counter, and the `/usr/local/bin/zvknhk_bench` runner,
+  all built from `../riscv-pqc` by `make zvknhk-openssl`
 - BusyBox rescue PID1: `/usr/local/sbin/karudeb-busybox-init`
 - JWM/VNC profile: disabled unless `KARUDEB_JWM_VNC=1`; when installed, the
   VNC service is manually startable but does not autostart unless
@@ -215,32 +224,24 @@ Zvk+Keccak, Smcntrpmf/Sscofpmf advertised in the live DTB):
 ```sh
 /usr/local/bin/perf_run --user-count -- /bin/sleep 3
 su karu -c '/usr/local/bin/perf_run --user-count -- /bin/sleep 3'
-cd /home/karu
-su karu -c '/usr/local/bin/perf_run --user-count -- ./xmlkem.rv64gcv_zbb'
+su karu -c '/usr/local/bin/perf_run --user-count -- /usr/local/bin/pqcbench mlkem-encap 100'
 ```
 
 The `sleep 3` runs reported about 20 million cycles and 1.7-1.9 million
 instructions, far below three seconds of 75 MHz wall-clock cycles, so
 kernel/idle time was excluded. The ML-KEM benchmark completed as `karu` and the
 wrapper printed whole-process user counts, confirming that the
-Linux perf-event -> OpenSBI -> Smcntrpmf/Sscofpmf path is usable. Separate raw
+Linux perf-event -> OpenSBI -> Smcntrpmf/Sscofpmf path is usable. That run
+used the since-removed repo-local `xmlkem` binary; `pqcbench` exercises the
+same counter path. Separate raw
 `perf_run` invocations are not a reliable global monotonic-counter test after
 perf events have been opened and closed; use raw `rdcycle`/`rdinstret` inside a
 single benchmark process for low-overhead bracketed measurements.
 
-The ML-KEM and ML-DSA benchmark sources are repo-local under
-`tools/pqc/mlkem` and `tools/pqc/mldsa`. Build the standalone test binaries
-there, then copy the selected output into the target rootfs or the `karu`
-user's NFS home before running it with `perf_run`:
-
-```sh
-make -C tools/pqc/mlkem
-make -C tools/pqc/mldsa
-```
-
-The ML-KEM example above uses the `xmlkem` binary variants produced by
-`tools/pqc/mlkem/test_matrix.sh`. The top-level `make clean` target delegates
-to both PQC source trees.
+The ML-KEM and ML-DSA benchmarks come from the `../riscv-pqc` reference tree
+as a static `vkeccak.vi`-patched OpenSSL plus its `pqcbench` driver; see
+[Zvknhk OpenSSL benchmark](#zvknhk-openssl-benchmark) for building them with
+`make zvknhk-openssl` and running `zvknhk_bench` on the target.
 
 Common overrides:
 
@@ -266,6 +267,9 @@ Set `KARUDEB_OPENSSL_ZVK_BENCH=0` to skip installing the OpenSSL RISC-V crypto
 benchmark script.
 Set `KARUDEB_OPENSSL_ZVK_KAT=0` to skip building the helper used for GCM/GHASH
 known-answer tests.
+Set `KARUDEB_ZVKNHK_OPENSSL=0` to skip installing the Zvknhk OpenSSL benchmark
+binaries, or `KARUDEB_ZVKNHK_DIR` to take them from another staging directory
+than `build/zvknhk`.
 The default root password hash is for the lab password `root`; override
 `ROOT_PASSWORD_HASH='*'` to lock the account, or set
 `KARUDEB_SHADOW_LAST_CHANGE` if you want normal shadow password aging instead
@@ -344,6 +348,94 @@ Create a transportable rootfs archive:
 The archive records target-side numeric owners. This is the preferred handoff
 from a rootless build to a root-owned NFS export directory.
 
+## Zvknhk OpenSSL benchmark
+
+The ML-KEM and ML-DSA benchmarks are the OpenSSL-based ones from the
+`../riscv-pqc` reference tree (`zvknhk/`), which also holds the Spike and QEMU
+implementations of the `Zvknhk` Vector Keccak extension and its `vkeccak.vi`
+instruction. Nothing PQC-specific is repo-local any more: the earlier
+standalone `tools/pqc` ML-KEM/ML-DSA sources used the pre-specification
+`vkeccak` encoding and were removed.
+
+`scripts/build-zvknhk-openssl.sh` applies riscv-pqc's anchor-based OpenSSL
+patch to its pristine OpenSSL submodule, configures OpenSSL out of tree under
+`build/zvknhk/openssl` so riscv-pqc keeps its own build directory, and
+cross-builds a static `apps/openssl` plus `demo/pqcbench.c` against the same
+`libcrypto.a`:
+
+```sh
+git -C ../riscv-pqc submodule update --init zvknhk/demo/openssl
+make zvknhk-openssl
+make zvknhk-check
+```
+
+`make zvknhk-check` runs known-answer, fingerprint, and SIGILL negative checks
+under riscv-pqc's user-mode QEMU and is skipped if that QEMU has not been built
+(`make -C ../riscv-pqc/zvknhk qemu`). The binaries are static because the
+`riscv64-unknown-linux-gnu` sysroot glibc is newer than Debian trixie's.
+`build-rootfs.sh` installs them by default and fails with a hint if
+`build/zvknhk/bin` is missing; set `KARUDEB_ZVKNHK_OPENSSL=0` to build a
+rootfs without them. Override `RISCV_PQC_DIR` if riscv-pqc is not checked out
+next to this repository.
+
+On the target, `zvknhk_bench` runs the riscv-pqc demo checks natively and then
+the hardware measurements, each with the instruction on
+(`OPENSSL_riscvcap=rv64gc_v_zvknhk`) and off (`rv64gc`):
+
+```sh
+su - karu
+zvknhk_bench --n 10 --reps 5 --seconds 5
+zvknhk_bench --check-only
+```
+
+It runs SHA-3/SHAKE known answers (including 200-byte SHAKE outputs, which
+reach the squeeze-side permutation), ML-KEM-768 and ML-DSA-65 round trips, a
+fingerprint comparison of deterministic keys and signatures across both
+backends, `pqcbench all N REPS` (best-of `rdcycle`/`rdinstret` per operation)
+and `openssl speed` for `sha3-256`, `shake128`, `ML-KEM-768`, and `ML-DSA-65`.
+Logs plus `kat.csv`, `cycles.csv`, and `speed.csv` are written under the
+printed output directory. Zvknhk has no hwprobe key, so `OPENSSL_riscvcap` is
+the only way the patched OpenSSL enables the instruction, and the `_v_` needs
+its own underscore. If `vkeccak.vi` traps with SIGILL, for example on a
+bitstream that still implements the older encoding, the script says so and
+runs the software path only; pass `--require-zvknhk` to fail instead.
+
+The same binaries can be driven by hand:
+
+```sh
+OPENSSL_riscvcap=rv64gc           pqcbench all 10 5
+OPENSSL_riscvcap=rv64gc_v_zvknhk  pqcbench all 10 5
+OPENSSL_riscvcap=rv64gc_v_zvknhk  openssl-zvknhk speed -seconds 5 ML-KEM-768 ML-DSA-65
+perf_run --user-count -- pqcbench mldsa-sign 100
+```
+
+`pqcbench` reads the counter CSRs directly, so it relies on the
+`karudeb-benchmark-counters` service having set `kernel.perf_user_access=2`;
+otherwise it falls back to wall-clock timing and says so.
+
+To exercise the image before hardware with the new instruction is available,
+boot it under riscv-pqc's patched QEMU with the `zvknhk` CPU feature:
+
+```sh
+make kernel-qemu
+./scripts/package-rootfs.sh
+./scripts/install-9p-root.sh
+QEMU_SYSTEM=../riscv-pqc/zvknhk/qemu-src/build/qemu-system-riscv64 \
+QEMU_CPU='rv64,v=true,vlen=256,elen=64,zvknhk=true' \
+KERNEL=build/linux-riscv64/arch/riscv/boot/Image \
+NET_MODE=none \
+./scripts/run-qemu-9p.sh
+```
+
+`QEMU_SYSTEM` is also honoured by `run-qemu-nfs.sh` and `test-qemu-vnc.sh`.
+The riscv-pqc QEMU is built without the slirp user-mode network backend, so
+the default `NET_MODE=user` SSH/VNC port forwards are not available with it;
+use the serial console (root autologin) or `NET_MODE=tap`. QEMU answers the
+counter CSRs with host ticks rather than cycles, so `pqcbench` flags its
+counter check there: the checks are meaningful under QEMU, the cycle figures
+are not. A Linux 7.2.2 QEMU boot of this image with `zvknhk=true` passed all
+`zvknhk_bench` checks on 2026-09-10.
+
 ## Kernel requirements
 
 For initramfs-less NFS root, these pieces need to be built in, not modules:
@@ -368,8 +460,8 @@ The generated kernel image is usually:
 build/linux-riscv64/arch/riscv/boot/Image
 ```
 
-The QEMU wrapper fetches and verifies Linux 7.1.2 under
-`build/kernel-source/linux-7.1.2` if the source tree is missing.
+The QEMU wrapper fetches and verifies Linux 7.2.2 under
+`build/kernel-source/linux-7.2.2` if the source tree is missing.
 
 By default this builds only `Image`. Set `BUILD_TARGETS='Image modules dtbs'`
 if you also need a module tree or board DTBs.
@@ -775,12 +867,23 @@ DTB_VARIANT=ddr ./scripts/build-karu64-dtb.sh
 ./scripts/stage-karu64-tftp.sh
 ```
 
-The karu64 kernel wrapper starts from `allnoconfig` and then adds only the
+The karu64 kernel wrapper starts from `allnoconfig` and then adds the
 single-board pieces needed for this path: RV64GCV userspace support, 8250 UART,
 PLIC, LiteEth, IPv4 autoconfiguration, NFSv3 root, and the RISC-V feature
 switches Linux needs to consume detected Supm, Zawrs, Zba/Zbb, and CBO support.
 It also enables ELF/script binary formats and initrd support; the allnoconfig
 baseline otherwise cannot execute `/sbin/init`, BusyBox, or shebang scripts.
+
+The RVA23/Zvk NFS-root profile also builds in the kernel primitives needed for
+Docker-style containers because modules are disabled in this release kernel:
+cgroups, PID/UTS/IPC/user/network/time namespaces, seccomp filters, keys,
+POSIX message queues, veth, bridge, IPv4/IPv6 netfilter with nftables and
+iptables compatibility, OverlayFS, and local ext4/xfs backing filesystems.
+Docker userspace is not installed by default. Add packages such as `docker.io`,
+`containerd`, `runc`, `iptables`, and `nftables` to the rootfs when testing it.
+Do not place Docker's `overlay2` graph directly on the NFS root; mount a local
+ext4/xfs scratch device or image at `/var/lib/docker`, or use Docker's `vfs`
+storage driver only for quick experiments.
 
 The RV64GC and RV64GCV/Zvk NFS-root board fragments also enable
 `CONFIG_PERF_EVENTS`, `CONFIG_RISCV_PMU`, `CONFIG_RISCV_PMU_LEGACY`, and
@@ -805,7 +908,7 @@ and sim DTBs advertise the default full-vector karu64 profile:
 - vector subsets `zve32x`, `zve32f`, `zve64x`, `zve64f`, `zve64d`, `zvfhmin`
 
 The legacy `riscv,isa` string also carries `zvl256b` for tools that consume it.
-Linux 7.1.2 does not accept `zvl*` in `riscv,isa-extensions`; it probes the
+Linux 7.2.2 does not accept `zvl*` in `riscv,isa-extensions`; it probes the
 actual vector length from the vector CSRs. The default DTBs intentionally do not
 advertise M-mode pointer masking `smmpm`, opt-in `zvkb`/`zvk*`, DIEL assertions
 `zkt`/`zvkt`, full `zvfh`, `zvbb`, or `zvbc`.
@@ -813,7 +916,7 @@ advertise M-mode pointer masking `smmpm`, opt-in `zvkb`/`zvk*`, DIEL assertions
 The `zvk-ddr` DTB variant advertises the implemented standard Zvk leaves
 (`zvkb`, `zvkg`, `zvkned`, `zvknha`, `zvknhb`, `zvksed`, `zvksh`) plus the
 scalar and vector data-independent execution latency assertions `zkt` and
-`zvkt`, and `smcntrpmf`/`sscofpmf`. Linux 7.1.2 uses `sscofpmf` for PMU
+`zvkt`, and `smcntrpmf`/`sscofpmf`. Linux 7.2.2 uses `sscofpmf` for PMU
 overflow support and silently ignores the `smcntrpmf` token; OpenSBI consumes
 the same structured list and probes the CSRs before programming counter
 filters for perf events such as `instructions:u`.
@@ -874,7 +977,7 @@ make karu-rv64imac-tftp
 
 The configuration sources are:
 
-- `configs/linux-riscv64-karu64-rv64imac.fragment` for Linux 7.1.2 with
+- `configs/linux-riscv64-karu64-rv64imac.fragment` for Linux 7.2.2 with
   `CONFIG_FPU` off and the built-in LiteEth driver.
 - `configs/busybox-karu64-rv64imac.fragment` for static rv64imac/lp64
   BusyBox plus basic network applets.
