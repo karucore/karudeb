@@ -44,6 +44,9 @@ EXT4_SRC="$(abs_path "$EXT4_SRC")"
 KARUDEB_SSH_AUTHORIZED_KEYS="$(abs_path "$KARUDEB_SSH_AUTHORIZED_KEYS")"
 KERNEL="$(abs_path "$KERNEL")"
 QEMU_PID_FILE="$(abs_path "$QEMU_PID_FILE")"
+# Records which executable start launched, so status/stop recognise the
+# process even when QEMU_SYSTEM is not set for them.
+QEMU_EXE_FILE="$QEMU_PID_FILE.exe"
 QEMU_LOG_FILE="$(abs_path "$QEMU_LOG_FILE")"
 QEMU_ERR_FILE="$(abs_path "$QEMU_ERR_FILE")"
 
@@ -115,14 +118,45 @@ remove_generated_path() {
   rm -rf "$abs"
 }
 
+# The QEMU executable as configured, resolved through PATH and symlinks so it
+# can be compared with /proc/<pid>/exe.
+qemu_system_exe() {
+  local exe
+
+  exe="$(command -v "$QEMU_SYSTEM" 2>/dev/null)" || return 1
+  abs_path "$exe"
+}
+
+# A pid is ours when it runs this rootfs image and its executable is the
+# configured QEMU_SYSTEM, the executable recorded by start, or some
+# qemu-system-* binary. The latter two keep status/stop working when
+# QEMU_SYSTEM was only set for start.
 pid_is_qemu() {
   local pid="$1"
-  local cmdline
+  local cmdline exe want recorded
 
   [[ -n "$pid" ]] || return 1
   [[ -r "/proc/$pid/cmdline" ]] || return 1
   cmdline="$(tr '\0' ' ' <"/proc/$pid/cmdline")"
-  [[ "$cmdline" == *qemu-system-riscv64* && "$cmdline" == *"$ROOTFS_IMAGE"* ]]
+  [[ "$cmdline" == *"$ROOTFS_IMAGE"* ]] || return 1
+
+  want="$(qemu_system_exe 2>/dev/null || true)"
+  recorded=""
+  [[ -f "$QEMU_EXE_FILE" ]] && recorded="$(tr -d '[:space:]' <"$QEMU_EXE_FILE")"
+
+  exe="$(readlink "/proc/$pid/exe" 2>/dev/null || true)"
+  exe="${exe% (deleted)}"
+  if [[ -n "$exe" ]]; then
+    [[ -n "$want" && "$exe" == "$want" ]] && return 0
+    [[ -n "$recorded" && "$exe" == "$recorded" ]] && return 0
+    [[ "$(basename "$exe")" == qemu-system-* ]] && return 0
+    return 1
+  fi
+  # /proc/<pid>/exe is unreadable for processes of another user; fall back to
+  # the command line.
+  [[ "$cmdline" == *"$(basename "$QEMU_SYSTEM")"* ]] && return 0
+  [[ -n "$recorded" && "$cmdline" == *"$(basename "$recorded")"* ]] && return 0
+  [[ "$cmdline" == *qemu-system-* ]]
 }
 
 qemu_pid() {
@@ -330,7 +364,8 @@ start_qemu() {
   append="${APPEND:-console=ttyS0,115200 root=/dev/vda rw rootwait ip=dhcp earlycon=uart8250,mmio,0x10000000,115200 loglevel=7 $APPEND_EXTRA}"
 
   mkdir -p "$(dirname "$QEMU_PID_FILE")" "$(dirname "$QEMU_LOG_FILE")" "$(dirname "$QEMU_ERR_FILE")"
-  rm -f "$QEMU_PID_FILE" "$QEMU_LOG_FILE" "$QEMU_ERR_FILE"
+  rm -f "$QEMU_LOG_FILE" "$QEMU_ERR_FILE" "$QEMU_PID_FILE" "$QEMU_EXE_FILE"
+  qemu_system_exe >"$QEMU_EXE_FILE" 2>/dev/null || rm -f "$QEMU_EXE_FILE"
 
   qemu_args=(
     -machine "$QEMU_MACHINE"
@@ -375,7 +410,7 @@ stop_qemu() {
 
   if ! pid="$(qemu_pid 2>/dev/null)"; then
     info "No matching QEMU process found for $QEMU_PID_FILE"
-    rm -f "$QEMU_PID_FILE"
+    rm -f "$QEMU_PID_FILE" "$QEMU_EXE_FILE"
     return 0
   fi
 
@@ -384,7 +419,7 @@ stop_qemu() {
   end=$((SECONDS + 30))
   while (( SECONDS < end )); do
     if ! kill -0 "$pid" 2>/dev/null; then
-      rm -f "$QEMU_PID_FILE"
+      rm -f "$QEMU_PID_FILE" "$QEMU_EXE_FILE"
       break
     fi
     sleep 1
@@ -393,7 +428,7 @@ stop_qemu() {
   if kill -0 "$pid" 2>/dev/null; then
     info "QEMU did not exit after SIGTERM; sending SIGKILL"
     kill -KILL "$pid" 2>/dev/null || true
-    rm -f "$QEMU_PID_FILE"
+    rm -f "$QEMU_PID_FILE" "$QEMU_EXE_FILE"
   fi
 
   if [[ "$E2FSCK_ON_STOP" == "1" && -f "$ROOTFS_IMAGE" ]]; then

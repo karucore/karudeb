@@ -41,9 +41,13 @@ PQCBENCH_SRC="${PQCBENCH_SRC:-$ZVKNHK_DIR/demo/pqcbench.c}"
 PATCH_SCRIPT="${PATCH_SCRIPT:-$ZVKNHK_DIR/scripts/apply-openssl-patch.sh}"
 QEMU_USER="${QEMU_USER:-$ZVKNHK_DIR/qemu-src/build/qemu-riscv64}"
 
-OUT_DIR="${OUT_DIR:-$PROJECT_ROOT/build/zvknhk}"
+OUT_DIR="$(abs_path "${OUT_DIR:-$PROJECT_ROOT/build/zvknhk}")"
 SSL_BUILD="$OUT_DIR/openssl"
 BIN_DIR="$OUT_DIR/bin"
+# Records the inputs the OpenSSL build directory was configured with, so a
+# changed source tree, cross prefix, or Configure flag set triggers a
+# reconfigure instead of silently reusing the old build.
+CONFIG_STAMP="$SSL_BUILD/.karudeb-configure"
 
 SSL_CROSS="${SSL_CROSS:-riscv64-unknown-linux-gnu-}"
 SSL_PREFIX="${SSL_PREFIX:-/usr/local/openssl-zvknhk}"
@@ -92,6 +96,26 @@ check_sources() {
   need_cmd make make
 }
 
+# Only ever remove trees under this repository's build/ directory. OUT_DIR is
+# an override, so a typo must not be able to take out unrelated data; this is
+# the same rule safe_remove_rootfs() in common.sh applies.
+check_removable() {
+  local path="$1"
+
+  [[ "$path" != "/" ]] || die "refusing to remove /"
+  [[ "$path" == "$PROJECT_ROOT"/build/* || "${ALLOW_REMOVE_OUTSIDE_BUILD:-0}" == "1" ]] || \
+    die "refusing to remove '$path'; set ALLOW_REMOVE_OUTSIDE_BUILD=1 if this is intentional"
+}
+
+configure_inputs() {
+  cat <<EOF
+ssl_src=$SSL_SRC
+cross=$SSL_CROSS
+prefix=$SSL_PREFIX
+configure=$SSL_CONFIG_FLAGS
+EOF
+}
+
 ssl_version() {
   local major minor patch
   major="$(sed -n 's/^MAJOR=//p' "$SSL_SRC/VERSION.dat")"
@@ -112,14 +136,25 @@ do_build() {
   info "Applying the Zvknhk OpenSSL patch"
   "$PATCH_SCRIPT"
 
-  mkdir -p "$SSL_BUILD" "$BIN_DIR"
-  if [[ ! -f "$SSL_BUILD/Makefile" ]]; then
+  # Reuse the build directory only when it was configured with exactly these
+  # inputs. Otherwise start it over: Configure alone would leave objects
+  # compiled under the previous flags in place.
+  if [[ -f "$SSL_BUILD/Makefile" && -f "$CONFIG_STAMP" ]] && \
+     cmp -s "$CONFIG_STAMP" <(configure_inputs); then
+    info "OpenSSL already configured with the same inputs; reusing $SSL_BUILD"
+  else
+    if [[ -e "$SSL_BUILD" ]]; then
+      info "OpenSSL configuration inputs changed; recreating $SSL_BUILD"
+      check_removable "$SSL_BUILD"
+      rm -rf "$SSL_BUILD"
+    fi
+    mkdir -p "$SSL_BUILD"
     info "Configuring OpenSSL: $SSL_CONFIG_FLAGS"
     # shellcheck disable=SC2086
     (cd "$SSL_BUILD" && perl "$SSL_SRC/Configure" $SSL_CONFIG_FLAGS)
-  else
-    info "OpenSSL already configured; remove $SSL_BUILD to reconfigure"
+    configure_inputs >"$CONFIG_STAMP"
   fi
+  mkdir -p "$BIN_DIR"
 
   info "Building OpenSSL (-j$JOBS)"
   make -C "$SSL_BUILD" -j"$JOBS" build_sw
@@ -214,7 +249,7 @@ do_check() {
 case "${1:-build}" in
   build) do_build ;;
   check) do_check ;;
-  clean) rm -rf "$OUT_DIR"; info "Removed $OUT_DIR" ;;
+  clean) check_removable "$OUT_DIR"; rm -rf "$OUT_DIR"; info "Removed $OUT_DIR" ;;
   -h|--help|help) usage ;;
   *) usage >&2; die "unknown action: $1" ;;
 esac
