@@ -44,8 +44,9 @@ This is intentionally separate from the root-owned NFS export used for hardware.
   initramfs image.
 - `tools/`: benchmark helpers installed into the rootfs, including the
   on-target `zvknhk_bench` runner for the Zvknhk OpenSSL benchmark.
-- `patches/`: Linux patches applied by `scripts/build-linux.sh` when the source
-  version matches.
+- `patches/`: Linux patches applied by `scripts/build-linux.sh`. Patches in
+  `patches/linux/` apply to every kernel version and the build fails if one
+  does not apply; `patches/linux-<version>/` holds version-specific ones.
 
 Generated rootfs trees, kernel builds, archives, disk images, TFTP staging
 trees, and QEMU logs are written under `build/` by default and are not part of
@@ -108,6 +109,15 @@ compiler, or set `LLVM=1` explicitly for the kernel's LLVM build path.
 The Zvknhk OpenSSL benchmark binaries are cross-built from the `../riscv-pqc`
 checkout with its `riscv64-unknown-linux-gnu-` GCC toolchain (the one
 riscv-pqc itself uses); see [Zvknhk OpenSSL benchmark](#zvknhk-openssl-benchmark).
+That toolchain is the upstream `riscv-gnu-toolchain` build installed under
+`~/rv/riscv`, which `scripts/common.sh` puts first in `PATH`. Its GCC is the
+release upstream pins (15.2.0 as of the September 2026 measurements) and its
+clang is the 23.0.0git snapshot the June 2026 numbers were taken with; the
+Debian `riscv64-linux-gnu-gcc` in `/usr/bin` is not used. The GCC version is
+recorded in `build/zvknhk*/VERSION` and in the configure stamp, so a
+toolchain change forces a reconfigure. Keep the toolchain fixed across a
+benchmark series; a new compiler is a new variable and belongs in a separate
+run.
 
 For a smaller rootfs-only host, the minimum package set is:
 
@@ -139,7 +149,11 @@ supported. If it does not, install or enable the QEMU binfmt registration.
 
 Defaults:
 
-- Debian suite: `trixie`
+- Debian suite: `trixie`, with `trixie-security` and `trixie-updates` added
+  as apt sources; `mmdebstrap` installs from all three, so packages start at
+  their current security versions, and `apt upgrade` on the target sees
+  later ones. Set `KARUDEB_SECURITY_MIRROR=` (empty) or
+  `KARUDEB_SUITE_UPDATES=0` to drop either suite.
 - Architecture: `riscv64`
 - Output directory: `build/rootfs`
 - Init: `sysvinit`
@@ -436,6 +450,42 @@ counter check there: the checks are meaningful under QEMU, the cycle figures
 are not. A Linux 7.2.2 QEMU boot of this image with `zvknhk=true` passed all
 `zvknhk_bench` checks on 2026-09-10.
 
+### Hand-vectorised reference benchmarks (tools/pqc)
+
+`tools/pqc/mlkem` and `tools/pqc/mldsa` are the patched reference ML-KEM and
+ML-DSA implementations from the June 2026 karu64 measurements, with
+hand-written RVV intrinsics (`MLKEM_RVV`/`MLDSA_RVV`) and the `vkeccak.vi`
+Keccak wrapper (`VK_KECCAK`). They were briefly removed when the OpenSSL
+benchmark replaced them and are kept for the numbers OpenSSL cannot give:
+OpenSSL has no vector lattice arithmetic, so its speedup from `vkeccak.vi` is
+the Keccak share alone, while these show the instruction combined with
+vectorised NTT and sampling. Their Keccak wrapper was ported to the
+specification encoding (`vd = v0`, `x18` fixed field, `imm5 = 0`; the old
+`x17`/`x24` form traps on the current bitstream), and all variants pass their
+ACVP known-answer files for every parameter set.
+
+They build with the `riscv64-unknown-linux-gnu-clang` toolchain and `$RISCV`:
+
+```sh
+cd tools/pqc/mlkem && RUN=0 ./test_matrix.sh    # xmlkem.<variant> binaries
+cd tools/pqc/mldsa && RUN=0 ./test_matrix.sh    # xmldsa.<variant> binaries
+```
+
+Without `RUN=0` each variant is also run under Spike with `pk`, using the
+`zvknhk` extension name. The variants are `rv64gc`, `rv64gc_zbb`, `rv64gcv`,
+`rv64gcv_zbb`, `rv64gcv_intr_zbb` (intrinsics), `rv64gcv_vkec` (Keccak
+instruction) and `rv64gcv_intr_vkec` (both). On the board, copy the binaries
+and the `refkat` directory into the export and run them under `perf_run` so
+the counters are live and user-only:
+
+```sh
+./xmlkem.rv64gcv_intr_vkec refkat/ml-kem-kat.txt          # known answers
+perf_run --user-count -- ./xmlkem.rv64gcv_intr_vkec        # cycle benchmark
+perf_run --user-count -- ./xmldsa.rv64gcv_intr_vkec
+```
+
+The top-level `make clean` delegates to both trees.
+
 ## Kernel requirements
 
 For initramfs-less NFS root, these pieces need to be built in, not modules:
@@ -460,8 +510,8 @@ The generated kernel image is usually:
 build/linux-riscv64/arch/riscv/boot/Image
 ```
 
-The QEMU wrapper fetches and verifies Linux 7.2.2 under
-`build/kernel-source/linux-7.2.2` if the source tree is missing.
+The QEMU wrapper fetches and verifies Linux 7.2.4 under
+`build/kernel-source/linux-7.2.4` if the source tree is missing.
 
 By default this builds only `Image`. Set `BUILD_TARGETS='Image modules dtbs'`
 if you also need a module tree or board DTBs.
@@ -845,6 +895,14 @@ The generated `build/karu64/tftp/zvk-ddr/uboot-netboot-one-line.txt` is the
 default `VCU118_NETBOOT_FILE_VEC` input consumed by `../karu64` when building
 the vector ROM board image.
 
+Each TFTP fetch in the generated commands is retried `TFTP_RETRIES` times
+(default 3) and `booti` only runs when both fetches succeeded; otherwise
+U-Boot prints a message and stays at its prompt. This replaced a plain
+`;`-chained sequence after a warm-reset transfer of `Image` timed out partway
+on 2026-09-11 and U-Boot booted the truncated kernel, which hung the board
+silently. The change reaches the board only through the ROM's baked bootcmd,
+so it needs a `../karu64` ROM bitstream rebuild.
+
 A VCU118 hardware boot validation on 2026-06-29 confirmed the rebuilt release
 path end to end: U-Boot fetched the staged `Image` and `board.dtb` from
 `192.168.42.1`, Linux booted as `7.1.2-zvk`, configured `eth0` as
@@ -896,6 +954,19 @@ measurement target. On a validated full-vector board run, the live kernel
 reported `riscv-pmu-sbi: 16 firmware and 31 hardware counters`, and
 `perf_run --user-count` worked for both `root` and `karu`.
 
+That only holds with `patches/linux/0001-riscv-pmu-keep-fixed-counters-usable-for-benchmarks.patch`
+applied. The karu64 ROM device tree has no `pmu` node, so OpenSBI 1.8.1 has an
+empty hardware event map and its SBI 3.0 `PMU_EVENT_GET_INFO` call reports even
+the mandatory cycle and instret events as unsupported once the hart advertises
+Sscofpmf. An unpatched kernel then marks both perf events `-ENOENT` at probe,
+`perf_event_open` for cycles or instructions fails, and the fixed counters the
+kernel stopped at PMU init are never restarted, so `rdcycle`/`rdinstret` stay
+frozen at one value. The patch maps the two events directly and leaves the
+fixed counters running. This bit the 7.2.2 board kernel on 2026-09-11 because
+the patch then lived in a `linux-7.1.1` directory and was skipped. The ROM-side
+alternative is a `pmu` node with `riscv,event-to-mhpmcounters` for events 1 and
+2, which needs a bitstream rebuild.
+
 The staged `board.dtb` is the feature handoff for OpenSBI/U-Boot/Linux. The DDR
 and sim DTBs advertise the default full-vector karu64 profile:
 
@@ -908,7 +979,7 @@ and sim DTBs advertise the default full-vector karu64 profile:
 - vector subsets `zve32x`, `zve32f`, `zve64x`, `zve64f`, `zve64d`, `zvfhmin`
 
 The legacy `riscv,isa` string also carries `zvl256b` for tools that consume it.
-Linux 7.2.2 does not accept `zvl*` in `riscv,isa-extensions`; it probes the
+Linux 7.2.4 does not accept `zvl*` in `riscv,isa-extensions`; it probes the
 actual vector length from the vector CSRs. The default DTBs intentionally do not
 advertise M-mode pointer masking `smmpm`, opt-in `zvkb`/`zvk*`, DIEL assertions
 `zkt`/`zvkt`, full `zvfh`, `zvbb`, or `zvbc`.
@@ -916,7 +987,7 @@ advertise M-mode pointer masking `smmpm`, opt-in `zvkb`/`zvk*`, DIEL assertions
 The `zvk-ddr` DTB variant advertises the implemented standard Zvk leaves
 (`zvkb`, `zvkg`, `zvkned`, `zvknha`, `zvknhb`, `zvksed`, `zvksh`) plus the
 scalar and vector data-independent execution latency assertions `zkt` and
-`zvkt`, and `smcntrpmf`/`sscofpmf`. Linux 7.2.2 uses `sscofpmf` for PMU
+`zvkt`, and `smcntrpmf`/`sscofpmf`. Linux 7.2.4 uses `sscofpmf` for PMU
 overflow support and silently ignores the `smcntrpmf` token; OpenSBI consumes
 the same structured list and probes the CSRs before programming counter
 filters for perf events such as `instructions:u`.
@@ -977,7 +1048,7 @@ make karu-rv64imac-tftp
 
 The configuration sources are:
 
-- `configs/linux-riscv64-karu64-rv64imac.fragment` for Linux 7.2.2 with
+- `configs/linux-riscv64-karu64-rv64imac.fragment` for Linux 7.2.4 with
   `CONFIG_FPU` off and the built-in LiteEth driver.
 - `configs/busybox-karu64-rv64imac.fragment` for static rv64imac/lp64
   BusyBox plus basic network applets.

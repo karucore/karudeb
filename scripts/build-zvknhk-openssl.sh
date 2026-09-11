@@ -57,6 +57,13 @@ SSL_PREFIX="${SSL_PREFIX:-/usr/local/openssl-zvknhk}"
 # machinery that static glibc would only warn about, and no-tests keeps the
 # build to libcrypto, libssl, and the apps.
 SSL_CONFIG_FLAGS="${SSL_CONFIG_FLAGS:-linux64-riscv64 --cross-compile-prefix=$SSL_CROSS --prefix=$SSL_PREFIX --openssldir=$SSL_PREFIX/ssl no-shared no-dso no-module no-tests -static}"
+# Extra compiler flags for both OpenSSL (Configure forwards unknown -options to
+# CFLAGS) and pqcbench. Empty means the toolchain default, which for the
+# riscv64-unknown-linux-gnu GCC here is -march=rv64gcv: GCC then
+# autovectorises ML-KEM/ML-DSA arithmetic, which is slow on a core whose
+# vector multiply is a multi-cycle FSM. For a scalar baseline build use e.g.
+#   OUT_DIR=build/zvknhk-scalar SSL_CFLAGS='-march=rv64gc_zba_zbb_zbs' make zvknhk-openssl
+SSL_CFLAGS="${SSL_CFLAGS:-}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 VLEN="${VLEN:-256}"
 
@@ -78,6 +85,7 @@ Environment:
   OUT_DIR           staging directory (default: $OUT_DIR)
   SSL_CROSS         cross prefix (default: $SSL_CROSS)
   SSL_CONFIG_FLAGS  OpenSSL Configure arguments
+  SSL_CFLAGS        extra compiler flags for OpenSSL and pqcbench (default: none)
   JOBS              parallel make jobs (default: $JOBS)
   QEMU_USER         user-mode QEMU with Zvknhk for 'check'
 EOF
@@ -107,12 +115,21 @@ check_removable() {
     die "refusing to remove '$path'; set ALLOW_REMOVE_OUTSIDE_BUILD=1 if this is intentional"
 }
 
+# The compiler's own version line, so a toolchain change under the same
+# cross prefix (for example a riscv-gnu-toolchain rebuild into the same
+# install) also triggers a reconfigure and is visible in VERSION.
+cross_cc_version() {
+  "${SSL_CROSS}gcc" --version 2>/dev/null | head -1
+}
+
 configure_inputs() {
   cat <<EOF
 ssl_src=$SSL_SRC
 cross=$SSL_CROSS
+cc=$(cross_cc_version)
 prefix=$SSL_PREFIX
 configure=$SSL_CONFIG_FLAGS
+cflags=$SSL_CFLAGS
 EOF
 }
 
@@ -149,9 +166,9 @@ do_build() {
       rm -rf "$SSL_BUILD"
     fi
     mkdir -p "$SSL_BUILD"
-    info "Configuring OpenSSL: $SSL_CONFIG_FLAGS"
+    info "Configuring OpenSSL: $SSL_CONFIG_FLAGS $SSL_CFLAGS"
     # shellcheck disable=SC2086
-    (cd "$SSL_BUILD" && perl "$SSL_SRC/Configure" $SSL_CONFIG_FLAGS)
+    (cd "$SSL_BUILD" && perl "$SSL_SRC/Configure" $SSL_CONFIG_FLAGS $SSL_CFLAGS)
     configure_inputs >"$CONFIG_STAMP"
   fi
   mkdir -p "$BIN_DIR"
@@ -169,7 +186,8 @@ do_build() {
   # setjmp.h declares sigsetjmp() as a plain function while its glibc exports
   # only __sigsetjmp (glibc's own header maps one to the other with a macro),
   # so the mapping is supplied here to keep the static link resolvable.
-  "${SSL_CROSS}gcc" -O2 -Wall -static \
+  # shellcheck disable=SC2086
+  "${SSL_CROSS}gcc" -O2 -Wall -static $SSL_CFLAGS \
     -Dsigsetjmp=__sigsetjmp \
     -I"$SSL_SRC/include" -I"$SSL_BUILD/include" \
     -o "$BIN_DIR/pqcbench" "$PQCBENCH_SRC" \
@@ -180,7 +198,9 @@ do_build() {
 openssl=$ver
 riscv_pqc=$(git -C "$RISCV_PQC_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)
 cross=$SSL_CROSS
+cc=$(cross_cc_version)
 configure=$SSL_CONFIG_FLAGS
+cflags=$SSL_CFLAGS
 EOF
 
   info "Staged: $BIN_DIR/openssl"

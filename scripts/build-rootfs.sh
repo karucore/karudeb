@@ -9,6 +9,12 @@ source "$SCRIPT_DIR/common.sh"
 ARCH="${ARCH:-riscv64}"
 SUITE="${SUITE:-trixie}"
 MIRROR="${MIRROR:-http://deb.debian.org/debian}"
+# Security and stable-update suites. mmdebstrap installs from all of them, so
+# the image starts with current versions rather than the point-release ones,
+# and they stay in the image's apt sources for later upgrades. Set
+# KARUDEB_SECURITY_MIRROR= (empty) to build from the base suite only.
+KARUDEB_SECURITY_MIRROR="${KARUDEB_SECURITY_MIRROR-http://security.debian.org/debian-security}"
+KARUDEB_SUITE_UPDATES="${KARUDEB_SUITE_UPDATES:-1}"
 VARIANT="${VARIANT:-minbase}"
 ROOTFS_DIR="${ROOTFS_DIR:-$PROJECT_ROOT/build/rootfs}"
 KARUDEB_HOSTNAME="${KARUDEB_HOSTNAME:-karudeb}"
@@ -993,6 +999,16 @@ build_with_mmdebstrap() {
     fi
   fi
 
+  # Extra apt sources as one-line entries; mmdebstrap adds them to the base
+  # mirror for the install and writes all of them into the image's sources.
+  local -a extra_sources=()
+  if [[ -n "$KARUDEB_SECURITY_MIRROR" ]]; then
+    extra_sources+=("deb $KARUDEB_SECURITY_MIRROR $SUITE-security main")
+  fi
+  if [[ "$KARUDEB_SUITE_UPDATES" == "1" ]]; then
+    extra_sources+=("deb $MIRROR $SUITE-updates main")
+  fi
+
   local cmd=(
     mmdebstrap
     "${mode_args[@]}"
@@ -1001,7 +1017,7 @@ build_with_mmdebstrap() {
     --include="$PACKAGES"
     --components=main
     --aptopt='Apt::Install-Recommends "false"'
-    "$SUITE" "$ROOTFS_DIR" "$MIRROR"
+    "$SUITE" "$ROOTFS_DIR" "$MIRROR" "${extra_sources[@]}"
   )
 
   if [[ "$(id -u)" -eq 0 || "$MMDEBSTRAP_USE_SUDO" == "1" ]]; then
@@ -1031,6 +1047,18 @@ build_with_debootstrap() {
 
   as_root install -D -m 0755 "$qemu_bin" "$ROOTFS_DIR/usr/bin/$(basename "$qemu_bin")"
   as_root chroot "$ROOTFS_DIR" "/usr/bin/$(basename "$qemu_bin")" /bin/sh /debootstrap/debootstrap --second-stage
+
+  # debootstrap installs from the base suite only; add the update suites to
+  # the image's apt sources so a later `apt upgrade` on the target sees them.
+  {
+    printf 'deb %s %s main\n' "$MIRROR" "$SUITE"
+    if [[ -n "$KARUDEB_SECURITY_MIRROR" ]]; then
+      printf 'deb %s %s-security main\n' "$KARUDEB_SECURITY_MIRROR" "$SUITE"
+    fi
+    if [[ "$KARUDEB_SUITE_UPDATES" == "1" ]]; then
+      printf 'deb %s %s-updates main\n' "$MIRROR" "$SUITE"
+    fi
+  } | as_root tee "$ROOTFS_DIR/etc/apt/sources.list" >/dev/null
 }
 
 configure_locale() {

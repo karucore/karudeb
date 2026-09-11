@@ -1,4 +1,4 @@
-.PHONY: help clean distclean kernel-qemu zvknhk-openssl zvknhk-check zvknhk-clean karu-opensbi karu64-rv64imac-dtb karu64-rv64gc-linux karu64-zvk-linux karu64-rv64gc-dtb karu64-zvk-dtb karu64-rv64gc-tftp karu64-zvk-tftp karu-rv64imac-check karu-rv64imac-image karu-rv64imac-tftp test-vnc test-vnc-stop test-vnc-status
+.PHONY: help clean pqc-clean distclean kernel-qemu zvknhk-openssl zvknhk-check zvknhk-clean karu-opensbi karu64-rv64imac-dtb karu64-rv64gc-linux karu64-zvk-linux karu64-rv64gc-dtb karu64-zvk-dtb karu64-rv64gc-tftp karu64-zvk-tftp karu-rv64imac-check karu-rv64imac-image karu-rv64imac-tftp test-vnc test-vnc-stop test-vnc-status
 
 .DEFAULT_GOAL := help
 
@@ -6,7 +6,7 @@ help:
 	@printf '%s\n' 'Targets:'
 	@printf '  %-12s %s\n' clean 'remove local caches and QEMU logs'
 	@printf '  %-12s %s\n' distclean 'remove build/ as well'
-	@printf '  %-12s %s\n' kernel-qemu 'fetch/build Linux 7.2.2 QEMU kernel'
+	@printf '  %-12s %s\n' kernel-qemu 'fetch/build Linux 7.2.4 QEMU kernel'
 	@printf '  %-12s %s\n' zvknhk-openssl 'build static Zvknhk OpenSSL + pqcbench from ../riscv-pqc'
 	@printf '  %-12s %s\n' zvknhk-check 'check those binaries under the riscv-pqc user-mode QEMU'
 	@printf '  %-12s %s\n' zvknhk-clean 'remove build/zvknhk'
@@ -23,10 +23,15 @@ help:
 	@printf '  %-12s %s\n' test-vnc-stop 'stop the QEMU JWM VNC smoke test'
 	@printf '  %-12s %s\n' test-vnc-status 'show QEMU JWM VNC smoke test status'
 
-clean:
+PQC_DIRS := tools/pqc/mlkem tools/pqc/mldsa
+
+clean: pqc-clean
 	find scripts -type d -name '__pycache__' -prune -exec rm -rf {} +
 	find scripts -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 	rm -f build/*.log
+
+pqc-clean:
+	for dir in $(PQC_DIRS); do $(MAKE) -C $$dir clean; done
 
 distclean: clean
 	./scripts/clean-build.sh

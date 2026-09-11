@@ -322,7 +322,7 @@ ensure_kernel() {
   fi
 
   if [[ "$BUILD_KERNEL_IF_MISSING" == "1" && "$KERNEL" == "$PROJECT_ROOT/build/linux-riscv64/arch/riscv/boot/Image" ]]; then
-    info "Building missing Linux 7.2.2 QEMU kernel: $KERNEL"
+    info "Building missing Linux 7.2.4 QEMU kernel: $KERNEL"
     "$SCRIPT_DIR/build-qemu-linux.sh"
   fi
 

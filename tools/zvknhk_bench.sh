@@ -25,6 +25,11 @@ SECONDS_PER_TEST="${ZVKNHK_SECONDS:-5}"
 OUT_DIR="${ZVKNHK_OUT:-zvknhk-bench-$(date +%Y%m%d-%H%M%S)}"
 CAP="${ZVKNHK_CAP:-rv64gc_v_zvknhk}"
 NOCAP="${ZVKNHK_NOCAP:-rv64gc}"
+# pqcbench reads cycle/instret directly. On karu64 those fixed counters only
+# run while a perf event holds them open, and they count every privilege mode
+# unless the event excludes the kernel, so pqcbench is run under
+# `perf_run --user-count`, which does both. auto = use perf_run if installed.
+PERF_RUN="${ZVKNHK_PERF_RUN:-auto}"
 RUN_CHECK=1
 RUN_CYCLES=1
 RUN_SPEED=1
@@ -51,6 +56,8 @@ Options:
   --cap STR          OPENSSL_riscvcap for the vkeccak path
                      (default: rv64gc_v_zvknhk)
   --nocap STR        OPENSSL_riscvcap for the software path (default: rv64gc)
+  --perf-run PATH    perf_run wrapper for pqcbench (default: auto-detect)
+  --no-perf-run      run pqcbench bare (counters may read frozen on karu64)
   --check-only       run the checks only
   --no-check         skip the checks
   --no-cycles        skip pqcbench
@@ -61,10 +68,11 @@ Options:
 
 Environment mirrors the options:
   ZVKNHK_OPENSSL, ZVKNHK_PQCBENCH, ZVKNHK_N, ZVKNHK_REPS, ZVKNHK_SECONDS,
-  ZVKNHK_OUT, ZVKNHK_CAP, ZVKNHK_NOCAP
+  ZVKNHK_OUT, ZVKNHK_CAP, ZVKNHK_NOCAP, ZVKNHK_PERF_RUN
 
 pqcbench reads the cycle and instret CSRs directly; on karudeb the
-karudeb-benchmark-counters service enables that at boot.
+karudeb-benchmark-counters service permits that at boot, and perf_run
+--user-count keeps the counters running and user-only while pqcbench runs.
 EOF
 }
 
@@ -78,6 +86,8 @@ while [[ $# -gt 0 ]]; do
     --out) OUT_DIR="$2"; shift 2 ;;
     --cap) CAP="$2"; shift 2 ;;
     --nocap) NOCAP="$2"; shift 2 ;;
+    --perf-run) PERF_RUN="$2"; shift 2 ;;
+    --no-perf-run) PERF_RUN=none; shift ;;
     --check-only) RUN_CYCLES=0; RUN_SPEED=0; shift ;;
     --no-check) RUN_CHECK=0; shift ;;
     --no-cycles) RUN_CYCLES=0; shift ;;
@@ -115,6 +125,21 @@ if [[ "$RUN_CYCLES" == "1" && -z "$PQCBENCH_BIN" ]]; then
   exit 1
 fi
 
+# Command prefix for pqcbench measurements. perf_run execs its argument
+# literally, so pqcbench is passed as an absolute path.
+PQC_PREFIX=()
+PERF_RUN_BIN=""
+case "$PERF_RUN" in
+  none) ;;
+  auto) PERF_RUN_BIN="$(command -v perf_run 2>/dev/null || true)" ;;
+  *) PERF_RUN_BIN="$PERF_RUN" ;;
+esac
+if [[ -n "$PERF_RUN_BIN" ]]; then
+  [[ -x "$PERF_RUN_BIN" ]] || { echo "perf_run not found: $PERF_RUN_BIN" >&2; exit 1; }
+  PQC_PREFIX=("$PERF_RUN_BIN" --user-count --)
+  [[ -n "$PQCBENCH_BIN" ]] && PQCBENCH_BIN="$(cd "$(dirname "$PQCBENCH_BIN")" && pwd -P)/$(basename "$PQCBENCH_BIN")"
+fi
+
 if [[ "$STOP_VNC" == "1" && -x /etc/init.d/karudeb-vnc ]]; then
   /etc/init.d/karudeb-vnc stop >/dev/null 2>&1 || true
 fi
@@ -143,6 +168,11 @@ echo "OpenSSL:  $OPENSSL_BIN"
 "$OPENSSL_BIN" version 2>/dev/null | sed 's/^/          /'
 "$OPENSSL_BIN" version -a 2>/dev/null | sed -n 's/^CPUINFO: /          auto-detected /p'
 [[ -n "$PQCBENCH_BIN" ]] && echo "pqcbench: $PQCBENCH_BIN"
+if [[ -n "$PERF_RUN_BIN" ]]; then
+  echo "perf_run: $PERF_RUN_BIN --user-count (fixed counters kept running, user-only)"
+else
+  echo "perf_run: none (pqcbench reads the counters bare)"
+fi
 echo "caps:     vkeccak=$CAP software=$NOCAP"
 echo "kernel:   $(uname -r 2>/dev/null)"
 isa="$(sed -n 's/^isa[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo 2>/dev/null | head -1)"
@@ -295,10 +325,16 @@ run_cycles() {
     cap="$(mode_cap "$mode")"
     log="$OUT_DIR/logs/pqcbench-$mode.log"
     echo "-- $mode (OPENSSL_riscvcap=$cap)"
-    if OPENSSL_riscvcap="$cap" "$PQCBENCH_BIN" all "$PQC_N" "$PQC_REPS" >"$log" 2>&1; then
+    # Discarded warm-up: the first run after boot pages the static binary in
+    # over NFS root, which stretches pqcbench's counter probe and inflates
+    # its instruction count.
+    OPENSSL_riscvcap="$cap" "${PQC_PREFIX[@]}" "$PQCBENCH_BIN" mlkem-keygen 1 >/dev/null 2>&1 || true
+    if OPENSSL_riscvcap="$cap" "${PQC_PREFIX[@]}" "$PQCBENCH_BIN" all "$PQC_N" "$PQC_REPS" >"$log" 2>&1; then
       sed 's/^/   /' "$log"
       awk -v mode="$mode" -v cap="$cap" -v OFS=, \
-        '/^(mlkem|mldsa)-/ {print $1, mode, cap, $2, $3, $4, $5}' "$log" >>"$CYCLES_CSV"
+        '/^(mlkem|mldsa)-/ {print $1, mode, cap, $2, $3, $4, $5}
+         /^perf_user_(cycle|instret)=/ {split($0, kv, "="); print "process-" kv[1], mode, cap, kv[2], "", "", ""}' \
+        "$log" >>"$CYCLES_CSV"
     else
       fail "pqcbench ($mode) exited $?"
       sed 's/^/   /' "$log"
@@ -306,16 +342,16 @@ run_cycles() {
   done
 
   if [[ "$HAVE_VK" == "1" ]]; then
-    echo "-- summary (cycles/op, best of $PQC_REPS)"
-    awk -F, 'NR > 1 && $4 != "-" {
+    echo "-- summary (cycles/op, best of $PQC_REPS; process-* rows are whole-run user totals)"
+    printf '   %-22s %12s %12s %8s\n' op software vkeccak speedup
+    awk -F, 'NR > 1 && $4 != "-" && $4 != "" {
         c[$1 "," $2] = $4; ops[$1] = 1
       }
       END {
-        printf "   %-14s %12s %12s %8s\n", "op", "software", "vkeccak", "speedup"
         for (op in ops) {
           s = c[op ",software"]; v = c[op ",vkeccak"]
           if (s != "" && v != "" && v > 0)
-            printf "   %-14s %12d %12d %7.2fx\n", op, s, v, s / v
+            printf "   %-22s %12d %12d %7.2fx\n", op, s, v, s / v
         }
       }' "$CYCLES_CSV" | sort -k1,1
   fi

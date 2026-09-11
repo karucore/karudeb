@@ -103,7 +103,7 @@ if have_cmd arch-test; then
   fi
 fi
 check_cmd tar "package rootfs archive" tar
-check_cmd curl "fetch Linux 7.2.2 source when needed" curl
+check_cmd curl "fetch Linux 7.2.4 source when needed" curl
 check_cmd sha256sum "verify downloaded Linux source tarball" coreutils
 check_cmd xz "extract Linux .tar.xz source archive" xz-utils
 check_cmd python3 "seed QEMU 9p mapped-xattr metadata" python3
