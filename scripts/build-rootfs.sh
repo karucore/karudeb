@@ -9,6 +9,12 @@ source "$SCRIPT_DIR/common.sh"
 ARCH="${ARCH:-riscv64}"
 SUITE="${SUITE:-trixie}"
 MIRROR="${MIRROR:-http://deb.debian.org/debian}"
+# Security and stable-update suites. mmdebstrap installs from all of them, so
+# the image starts with current versions rather than the point-release ones,
+# and they stay in the image's apt sources for later upgrades. Set
+# KARUDEB_SECURITY_MIRROR= (empty) to build from the base suite only.
+KARUDEB_SECURITY_MIRROR="${KARUDEB_SECURITY_MIRROR-http://security.debian.org/debian-security}"
+KARUDEB_SUITE_UPDATES="${KARUDEB_SUITE_UPDATES:-1}"
 VARIANT="${VARIANT:-minbase}"
 ROOTFS_DIR="${ROOTFS_DIR:-$PROJECT_ROOT/build/rootfs}"
 KARUDEB_HOSTNAME="${KARUDEB_HOSTNAME:-karudeb}"
@@ -55,6 +61,8 @@ KARUDEB_TARGET_SYSROOT="${KARUDEB_TARGET_SYSROOT:-}"
 KARUDEB_TARGET_STATIC="${KARUDEB_TARGET_STATIC:-0}"
 KARUDEB_OPENSSL_ZVK_BENCH="${KARUDEB_OPENSSL_ZVK_BENCH:-1}"
 KARUDEB_OPENSSL_ZVK_KAT="${KARUDEB_OPENSSL_ZVK_KAT:-1}"
+KARUDEB_ZVKNHK_OPENSSL="${KARUDEB_ZVKNHK_OPENSSL:-1}"
+KARUDEB_ZVKNHK_DIR="${KARUDEB_ZVKNHK_DIR:-$PROJECT_ROOT/build/zvknhk}"
 
 DEFAULT_PACKAGES="sysvinit-core,sysv-rc,ifupdown,iproute2,netbase,openssh-server,sudo,procps,psmisc,iputils-ping,ca-certificates,busybox-static"
 VNC_PACKAGES="tigervnc-standalone-server,tigervnc-common,tigervnc-tools,jwm,xterm,xauth,x11-xserver-utils,fonts-dejavu-core"
@@ -204,6 +212,7 @@ configure_built_rootfs() {
       export KARUDEB_PERF_USER_ACCESS KARUDEB_PERF_EVENT_PARANOID
       export KARUDEB_PERF_RUN KARUDEB_PERF_RUN_CC KARUDEB_TARGET_CC KARUDEB_TARGET_SYSROOT KARUDEB_TARGET_STATIC
       export KARUDEB_OPENSSL_ZVK_BENCH KARUDEB_OPENSSL_ZVK_KAT
+      export KARUDEB_ZVKNHK_OPENSSL KARUDEB_ZVKNHK_DIR
       unshare --map-auto --setuid 0 --setgid 0 "$SCRIPT_DIR/build-rootfs.sh" || status=$?
       rm -f "$staged_ssh_host_key" "$staged_ssh_host_pub"
       return "$status"
@@ -601,6 +610,36 @@ configure_openssl_zvk_kat() {
   rm -f "$out"
 }
 
+# The Zvknhk (vkeccak.vi) OpenSSL benchmark binaries are cross-built from the
+# ../riscv-pqc reference tree by scripts/build-zvknhk-openssl.sh and staged
+# under build/zvknhk. They are static, so the rootfs needs no development
+# packages for them. The patched openssl lives under its own prefix and does
+# not replace the Debian openssl used by openssl_zvk_bench.
+configure_zvknhk_openssl() {
+  local src
+
+  [[ "$KARUDEB_ZVKNHK_OPENSSL" == "1" ]] || return 0
+  if [[ "$ARCH" != "riscv64" ]]; then
+    info "Skipping Zvknhk OpenSSL: only riscv64 rootfs is supported"
+    return 0
+  fi
+
+  [[ -x "$KARUDEB_ZVKNHK_DIR/bin/openssl" && -x "$KARUDEB_ZVKNHK_DIR/bin/pqcbench" ]] || \
+    die "missing Zvknhk OpenSSL binaries under $KARUDEB_ZVKNHK_DIR/bin; run 'make zvknhk-openssl' (needs ../riscv-pqc) or set KARUDEB_ZVKNHK_OPENSSL=0"
+  src="$PROJECT_ROOT/tools/zvknhk_bench.sh"
+  [[ -f "$src" ]] || die "missing Zvknhk benchmark script: $src"
+
+  rootfs_cmd install -D -m 0755 "$KARUDEB_ZVKNHK_DIR/bin/openssl" \
+    "$ROOTFS_DIR/usr/local/openssl-zvknhk/bin/openssl"
+  rootfs_cmd install -D -m 0755 "$KARUDEB_ZVKNHK_DIR/bin/pqcbench" "$ROOTFS_DIR/usr/local/bin/pqcbench"
+  rootfs_cmd install -D -m 0755 "$src" "$ROOTFS_DIR/usr/local/bin/zvknhk_bench"
+  rootfs_cmd ln -sf ../openssl-zvknhk/bin/openssl "$ROOTFS_DIR/usr/local/bin/openssl-zvknhk"
+  if [[ -f "$KARUDEB_ZVKNHK_DIR/VERSION" ]]; then
+    rootfs_cmd install -D -m 0644 "$KARUDEB_ZVKNHK_DIR/VERSION" \
+      "$ROOTFS_DIR/usr/local/openssl-zvknhk/VERSION"
+  fi
+}
+
 ensure_local_user() {
   local user="$1"
   local uid="$2"
@@ -960,6 +999,16 @@ build_with_mmdebstrap() {
     fi
   fi
 
+  # Extra apt sources as one-line entries; mmdebstrap adds them to the base
+  # mirror for the install and writes all of them into the image's sources.
+  local -a extra_sources=()
+  if [[ -n "$KARUDEB_SECURITY_MIRROR" ]]; then
+    extra_sources+=("deb $KARUDEB_SECURITY_MIRROR $SUITE-security main")
+  fi
+  if [[ "$KARUDEB_SUITE_UPDATES" == "1" ]]; then
+    extra_sources+=("deb $MIRROR $SUITE-updates main")
+  fi
+
   local cmd=(
     mmdebstrap
     "${mode_args[@]}"
@@ -968,7 +1017,7 @@ build_with_mmdebstrap() {
     --include="$PACKAGES"
     --components=main
     --aptopt='Apt::Install-Recommends "false"'
-    "$SUITE" "$ROOTFS_DIR" "$MIRROR"
+    "$SUITE" "$ROOTFS_DIR" "$MIRROR" "${extra_sources[@]}"
   )
 
   if [[ "$(id -u)" -eq 0 || "$MMDEBSTRAP_USE_SUDO" == "1" ]]; then
@@ -998,6 +1047,18 @@ build_with_debootstrap() {
 
   as_root install -D -m 0755 "$qemu_bin" "$ROOTFS_DIR/usr/bin/$(basename "$qemu_bin")"
   as_root chroot "$ROOTFS_DIR" "/usr/bin/$(basename "$qemu_bin")" /bin/sh /debootstrap/debootstrap --second-stage
+
+  # debootstrap installs from the base suite only; add the update suites to
+  # the image's apt sources so a later `apt upgrade` on the target sees them.
+  {
+    printf 'deb %s %s main\n' "$MIRROR" "$SUITE"
+    if [[ -n "$KARUDEB_SECURITY_MIRROR" ]]; then
+      printf 'deb %s %s-security main\n' "$KARUDEB_SECURITY_MIRROR" "$SUITE"
+    fi
+    if [[ "$KARUDEB_SUITE_UPDATES" == "1" ]]; then
+      printf 'deb %s %s-updates main\n' "$MIRROR" "$SUITE"
+    fi
+  } | as_root tee "$ROOTFS_DIR/etc/apt/sources.list" >/dev/null
 }
 
 configure_locale() {
@@ -1056,6 +1117,7 @@ EOF
   configure_perf_run
   configure_openssl_zvk_bench
   configure_openssl_zvk_kat
+  configure_zvknhk_openssl
   configure_karudeb_user "$shared_ssh_authorized_keys"
 
   write_rootfs_file etc/apt/apt.conf.d/99karudeb-no-recommends <<'EOF'

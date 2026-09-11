@@ -28,6 +28,7 @@ MEMORY="${MEMORY:-4G}"
 SMP="${SMP:-2}"
 QEMU_MACHINE="${QEMU_MACHINE:-virt}"
 QEMU_CPU="${QEMU_CPU:-rv64,v=true,vlen=256,elen=64}"
+QEMU_SYSTEM="${QEMU_SYSTEM:-qemu-system-riscv64}"
 QEMU_BIOS="${QEMU_BIOS:-default}"
 QEMU_NET_DEVICE="${QEMU_NET_DEVICE:-virtio-net-device}"
 QEMU_USER_HOSTFWD="${QEMU_USER_HOSTFWD:-hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:5901-:5901}"
@@ -43,7 +44,7 @@ fi
 
 [[ -d "$ROOTFS_DIR" ]] || die "rootfs directory not found: $ROOTFS_DIR"
 [[ -f "$KERNEL" ]] || die "kernel image not found: $KERNEL"
-need_cmd qemu-system-riscv64 qemu-system-riscv
+need_cmd "$QEMU_SYSTEM" qemu-system-riscv
 
 if [[ ! -r "$ROOTFS_DIR/etc/shadow" ]]; then
   die "$ROOTFS_DIR/etc/shadow is not readable by this user; use install-9p-root.sh to create a user-owned 9p rootfs"
@@ -112,4 +113,4 @@ fi
 info "Kernel: $KERNEL"
 info "9p rootfs: $ROOTFS_DIR"
 info "Append: $append"
-exec qemu-system-riscv64 "${args[@]}"
+exec "$QEMU_SYSTEM" "${args[@]}"

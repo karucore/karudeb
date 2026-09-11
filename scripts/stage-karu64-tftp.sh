@@ -20,6 +20,11 @@ NETMASK="${NETMASK:-255.255.255.0}"
 KARUDEB_HOSTNAME="${KARUDEB_HOSTNAME:-karudeb}"
 NFSROOT="${NFSROOT:-/srv/nfs/karudeb}"
 NFS_OPTS="${NFS_OPTS:-vers=3,tcp,nolock}"
+# TFTP attempts per file before the netboot gives up and leaves U-Boot at its
+# prompt. A warm-reset LiteEth link can drop mid-transfer; booting a truncated
+# Image hangs the board silently, so every fetch is retried and the boot chain
+# only continues when both fetches succeeded.
+TFTP_RETRIES="${TFTP_RETRIES:-3}"
 
 KERNEL_ADDR="${KERNEL_ADDR:-0x80200000}"
 case "$DTB_VARIANT" in
@@ -86,26 +91,56 @@ cp "$KERNEL" "$OUT_DIR/Image"
 cp "$DTB" "$OUT_DIR/board.dtb"
 cp "$DTB" "$OUT_DIR/karu64-$DTB_VARIANT.dtb"
 
+# "tftpboot A f || tftpboot A f || ..." with TFTP_RETRIES terms. Stored in an
+# environment variable and invoked with `run`, so its status is the status of
+# the last attempt and the && chain below sees one result per file. U-Boot's
+# hush evaluates && and || left to right with equal precedence, so the retry
+# group cannot be written inline without the DTB fetch masking a failed Image.
+tftp_retry_cmd() {
+  local addr="$1" file="$2" i out=""
+
+  for ((i = 1; i <= TFTP_RETRIES; i++)); do
+    [[ -z "$out" ]] || out="$out || "
+    out="${out}tftpboot $addr $file"
+  done
+  printf '%s' "$out"
+}
+
+FETCH_IMAGE="$(tftp_retry_cmd "$KERNEL_ADDR" Image)"
+FETCH_DTB="$(tftp_retry_cmd "$DTB_ADDR" board.dtb)"
+# Unquoted in the generated commands, so it must stay free of quotes and
+# semicolons: the one-liner passes through a Makefile shell expansion and
+# U-Boot's Kconfig string escaping before hush sees it.
+NETBOOT_FAIL_MSG="karu64 netboot: TFTP failed after $TFTP_RETRIES attempts - staying at the U-Boot prompt"
+
 cat >"$OUT_DIR/uboot-netboot.cmd" <<EOF
 setenv serverip $TFTP_SERVER
 setenv ipaddr $GUEST_IP
-tftpboot $KERNEL_ADDR Image
-tftpboot $DTB_ADDR board.dtb
+setenv karu_fetch_image '$FETCH_IMAGE'
+setenv karu_fetch_dtb '$FETCH_DTB'
 setenv bootargs $BOOTARGS
-booti $KERNEL_ADDR - $DTB_ADDR
+if run karu_fetch_image && run karu_fetch_dtb; then
+	booti $KERNEL_ADDR - $DTB_ADDR
+else
+	echo $NETBOOT_FAIL_MSG
+fi
 EOF
 if have_cmd mkimage; then
   mkimage -A riscv -O linux -T script -C none -n "karu64 netboot" \
     -d "$OUT_DIR/uboot-netboot.cmd" "$OUT_DIR/boot.scr" >/dev/null
 fi
 
+# The one-line form is baked into the ROM U-Boot as CONFIG_BOOTCOMMAND by
+# ../karu64. Same logic: the boot only proceeds past a fetch that succeeded,
+# and a failure ends at the prompt instead of booting a truncated Image.
 {
   printf 'setenv serverip %s; ' "$TFTP_SERVER"
   printf 'setenv ipaddr %s; ' "$GUEST_IP"
-  printf 'tftpboot %s Image; ' "$KERNEL_ADDR"
-  printf 'tftpboot %s board.dtb; ' "$DTB_ADDR"
+  printf "setenv karu_fetch_image '%s'; " "$FETCH_IMAGE"
+  printf "setenv karu_fetch_dtb '%s'; " "$FETCH_DTB"
   printf 'setenv bootargs %s; ' "$BOOTARGS"
-  printf 'booti %s - %s\n' "$KERNEL_ADDR" "$DTB_ADDR"
+  printf 'run karu_fetch_image && run karu_fetch_dtb && booti %s - %s || echo %s\n' \
+    "$KERNEL_ADDR" "$DTB_ADDR" "$NETBOOT_FAIL_MSG"
 } >"$OUT_DIR/uboot-netboot-one-line.txt"
 
 cat >"$OUT_DIR/layout.env" <<EOF

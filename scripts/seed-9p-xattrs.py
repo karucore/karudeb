@@ -63,6 +63,31 @@ def set_u32_xattr(path, name, value):
     )
 
 
+def seed_member(path, member):
+    def seed():
+        set_u32_xattr(path, "uid", member.uid)
+        set_u32_xattr(path, "gid", member.gid)
+        set_u32_xattr(path, "mode", member_mode(member))
+
+    try:
+        seed()
+        return
+    except PermissionError:
+        # Setting a user.* xattr needs write permission on the entry. The
+        # archive was extracted with its target modes, so read-only files such
+        # as /etc/sudoers and its drop-ins (0440) reject the write even though
+        # this user owns them. Open owner-write for the duration and restore.
+        st = os.lstat(path)
+        if stat.S_ISLNK(st.st_mode) or st.st_mode & stat.S_IWUSR:
+            raise
+
+    os.chmod(path, stat.S_IMODE(st.st_mode) | stat.S_IWUSR)
+    try:
+        seed()
+    finally:
+        os.chmod(path, stat.S_IMODE(st.st_mode))
+
+
 def main(argv):
     if len(argv) != 2:
         return die("usage: seed-9p-xattrs.py ROOTFS_DIR < rootfs.tar")
@@ -89,9 +114,7 @@ def main(argv):
                 continue
 
             try:
-                set_u32_xattr(path, "uid", member.uid)
-                set_u32_xattr(path, "gid", member.gid)
-                set_u32_xattr(path, "mode", member_mode(member))
+                seed_member(path, member)
             except OSError as exc:
                 if member.issym() and exc.errno in (
                     errno.EPERM,

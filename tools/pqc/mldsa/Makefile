@@ -21,7 +21,7 @@ LDFLAGS	+=	-static --sysroot=$(RISCV)/sysroot/usr
 LDLIBS	+=
 
 #	maximum isa string for spike
-SPIKEFL	=	--isa=rv64gcv_zbb_zvbb_zvbc_zvkg_zvkned_zvknhb_zvksed_zvksh_zvl256b_zvkk_zicntr_zihpm
+SPIKEFL	=	--isa=rv64gcv_zbb_zvbb_zvbc_zvkg_zvkned_zvknhb_zvksed_zvksh_zvl256b_zvknhk_zicntr_zihpm
 
 #	xtest
 $(XBIN):	$(OBJS)

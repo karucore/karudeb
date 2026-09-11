@@ -10,26 +10,59 @@ int64_t KeccakF1600_count = 0;
 
 #if VK_KECCAK == 1
 
+//  Zvknhk vkeccak.vi (riscv-pqc zvknhk.adoc), emitted with .insn because the
+//  assembler does not know the mnemonic. Only two R-type fields are operands:
+//      rd  = vd    the vector register group holding the 1600-bit state
+//      rs1 = x18   not a register: 0b10010 is a fixed part of the opcode
+//      rs2 = imm5  round selector, x0 => 0 => Keccak-p[1600,24]
+//  The state is one fixed element group of EGW=2048 bits from vd, spanning
+//  NREG = ceil(2048/VLEN) registers regardless of vl and LMUL; vd = v0 is an
+//  aligned group start at every VLEN. vl only matters for the vle64/vse64
+//  that move the 25 live lanes: at LMUL=8 VLMAX is 8*VLEN/64, at least 25
+//  for VLEN >= 256 but only 16 at VLEN = 128, where the transfer is split.
+//  The pre-specification form of this wrapper (rs1 = x17, rs2 = x24 as a
+//  literal round count, vd = v8) is no longer decoded by karu64.
+static inline unsigned long rv_vlenb(void)
+{
+    unsigned long r;
+    __asm__ volatile("csrr %0, 0xC22" : "=r"(r));  //  vlenb
+    return r;
+}
+
 // static
 void KeccakF1600_StatePermute(uint64_t state[25])
 {
-    unsigned long vl = 32;
-
     KeccakF1600_count++;
 
-    __asm volatile(
-        "vsetvli %[vl], %[vl], e64, m8, tu, mu\n"
-        "vmv.v.i v8, 0\n"
-        "vsetivli x0, 25, e64, m8, tu, mu\n"
-        "vle64.v v8, 0(%[state])\n"
-        "vsetvli %[vl], %[vl], e64, m8, tu, mu\n"
-        // .insn r opc, func3, func7, vd, vs1, vs2
-        ".insn r 0x77, 0x2, 0x53, x8, x17, x24\n"
-        "vsetivli x0, 25, e64, m8, tu, mu\n"
-        "vse64.v v8, 0(%[state])\n"
-        : [vl] "+r"(vl)
-        : [state] "r"(state)
-        : "memory");
+    if (rv_vlenb() >= 32) {                     //  VLEN >= 256
+        __asm volatile(
+            "vsetivli x0, 25, e64, m8, tu, mu\n"
+            "vle64.v v0, 0(%[s])\n"
+            // vkeccak.vi v0, 0
+            // .insn r opc, func3, func7, rd, rs1, rs2
+            ".insn r 0x77, 0x2, 0x53, x0, x18, x0\n"
+            "vse64.v v0, 0(%[s])\n"
+            :
+            : [s] "r"(state)
+            : "memory", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
+              "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15");
+    } else {                                    //  VLEN == 128
+        uint64_t *hi = state + 16;
+        __asm volatile(
+            "vsetivli x0, 16, e64, m8, tu, mu\n"
+            "vle64.v v0, 0(%[s])\n"
+            "vsetivli x0, 9, e64, m8, tu, mu\n"
+            "vle64.v v8, 0(%[h])\n"
+            ".insn r 0x77, 0x2, 0x53, x0, x18, x0\n"
+            "vsetivli x0, 16, e64, m8, tu, mu\n"
+            "vse64.v v0, 0(%[s])\n"
+            "vsetivli x0, 9, e64, m8, tu, mu\n"
+            "vse64.v v8, 0(%[h])\n"
+            :
+            : [s] "r"(state), [h] "r"(hi)
+            : "memory", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
+              "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15");
+    }
 }
 
 #else
