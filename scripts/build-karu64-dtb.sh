@@ -10,6 +10,10 @@ DTB_VARIANT="${DTB_VARIANT:-ddr}"
 OUT_DIR="${OUT_DIR:-$PROJECT_ROOT/build/karu64}"
 
 case "$DTB_VARIANT" in
+  rva23s64|rva23s64-ddr)
+    DTB_VARIANT="rva23s64-ddr"
+    DTS="${DTS:-$PROJECT_ROOT/configs/karu64-rva23s64-nfsroot-ddr.dts}"
+    ;;
   rv64imac|imac|rv64imac-ddr|imac-ddr)
     DTB_VARIANT="rv64imac-ddr"
     DTS="${DTS:-$PROJECT_ROOT/configs/karu64-rv64imac-ddr.dts}"
@@ -35,7 +39,7 @@ case "$DTB_VARIANT" in
     DTS="${DTS:-$PROJECT_ROOT/configs/karu64-nfsroot-sim.dts}"
     ;;
   *)
-    die "DTB_VARIANT must be 'rv64imac-ddr', 'zvk-ddr', 'rv64gc-ddr', 'ddr', or 'sim'"
+    die "DTB_VARIANT must be 'rva23s64-ddr', 'rv64imac-ddr', 'zvk-ddr', 'rv64gc-ddr', 'ddr', or 'sim'"
     ;;
 esac
 

@@ -1,0 +1,3 @@
+# Merge after linux-riscv64-karu64-zvk-nfsroot.fragment for the H-enabled image.
+CONFIG_VIRTUALIZATION=y
+CONFIG_KVM=y

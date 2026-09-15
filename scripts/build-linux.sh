@@ -10,6 +10,7 @@ LINUX_SRC="${LINUX_SRC:-${1:-}}"
 OUT_DIR="${OUT_DIR:-$PROJECT_ROOT/build/linux-riscv64}"
 DEFCONFIG="${DEFCONFIG:-defconfig}"
 FRAGMENT="${FRAGMENT:-$PROJECT_ROOT/configs/linux-riscv64-nfsroot.fragment}"
+EXTRA_FRAGMENT="${EXTRA_FRAGMENT:-}"
 CROSS_COMPILE="${CROSS_COMPILE:-}"
 LINUX_LLVM="${LLVM:-}"
 HOSTCC="${HOSTCC:-}"
@@ -31,6 +32,12 @@ fi
 [[ -d "$LINUX_SRC" ]] || die "Linux source directory not found: $LINUX_SRC"
 [[ -x "$LINUX_SRC/scripts/kconfig/merge_config.sh" ]] || die "missing merge_config.sh in Linux source"
 [[ -f "$FRAGMENT" ]] || die "kernel fragment not found: $FRAGMENT"
+fragments=("$FRAGMENT")
+if [[ -n "$EXTRA_FRAGMENT" ]]; then
+  EXTRA_FRAGMENT="$(abs_path "$EXTRA_FRAGMENT")"
+  [[ -f "$EXTRA_FRAGMENT" ]] || die "kernel fragment not found: $EXTRA_FRAGMENT"
+  fragments+=("$EXTRA_FRAGMENT")
+fi
 
 need_cmd make build-essential
 need_cmd patch patch
@@ -132,7 +139,7 @@ if [[ -n "$HOSTCXX" ]]; then
 fi
 
 make -C "$LINUX_SRC" O="$OUT_DIR" "${make_args[@]}" "$DEFCONFIG"
-"$LINUX_SRC/scripts/kconfig/merge_config.sh" -m -O "$OUT_DIR" "$OUT_DIR/.config" "$FRAGMENT"
+"$LINUX_SRC/scripts/kconfig/merge_config.sh" -m -O "$OUT_DIR" "$OUT_DIR/.config" "${fragments[@]}"
 make -C "$LINUX_SRC" O="$OUT_DIR" "${make_args[@]}" olddefconfig
 read -r -a build_targets <<<"$BUILD_TARGETS"
 make -C "$LINUX_SRC" O="$OUT_DIR" "${make_args[@]}" -j"$JOBS" "${build_targets[@]}"

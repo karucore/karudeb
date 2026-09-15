@@ -6,7 +6,7 @@ help:
 	@printf '%s\n' 'Targets:'
 	@printf '  %-12s %s\n' clean 'remove local caches and QEMU logs'
 	@printf '  %-12s %s\n' distclean 'remove build/ as well'
-	@printf '  %-12s %s\n' kernel-qemu 'fetch/build Linux 7.2.4 QEMU kernel'
+	@printf '  %-12s %s\n' kernel-qemu 'fetch/build Linux 7.2.6 QEMU kernel'
 	@printf '  %-12s %s\n' zvknhk-openssl 'build static Zvknhk OpenSSL + pqcbench from ../riscv-pqc'
 	@printf '  %-12s %s\n' zvknhk-check 'check those binaries under the riscv-pqc user-mode QEMU'
 	@printf '  %-12s %s\n' zvknhk-clean 'remove build/zvknhk'
@@ -14,6 +14,8 @@ help:
 	@printf '  %-12s %s\n' karu64-rv64imac-dtb 'build reduced RV64IMAC ROM control DTB'
 	@printf '  %-12s %s\n' karu64-rv64gc-linux 'build scalar RV64GC NFS-root kernel'
 	@printf '  %-12s %s\n' karu64-zvk-linux 'build RVA23/Zvk NFS-root kernel'
+	@printf '  %-12s %s\n' karu64-rva23s64-linux 'build H-enabled profile NFS-root/KVM kernel'
+	@printf '  %-12s %s\n' karu64-rva23s64-tftp 'stage matching profile kernel and DTB'
 	@printf '  %-12s %s\n' karu64-rv64gc-tftp 'stage scalar RV64GC NFS netboot files'
 	@printf '  %-12s %s\n' karu64-zvk-tftp 'stage RVA23/Zvk NFS netboot files'
 	@printf '  %-12s %s\n' karu-rv64imac-check 'check tools for karu64 RV64IMAC soft-float image'
@@ -79,6 +81,23 @@ karu64-rv64gc-tftp: karu64-rv64gc-linux karu64-rv64gc-dtb
 
 karu64-zvk-tftp: karu64-zvk-linux karu64-zvk-dtb
 	DTB_VARIANT=zvk-ddr ./scripts/stage-karu64-tftp.sh
+
+.PHONY: karu64-rva23s64-linux karu64-rva23s64-dtb karu64-rva23s64-tftp karu64-rva23s64-check
+karu64-rva23s64-linux:
+	OUT_DIR=build/linux-riscv64-karu64-rva23s64 \
+	FRAGMENT=configs/linux-riscv64-karu64-zvk-nfsroot.fragment \
+	EXTRA_FRAGMENT=configs/linux-riscv64-karu64-rva23s64.fragment \
+	DEFCONFIG=allnoconfig BUILD_TARGETS=Image \
+	./scripts/build-karu64-linux.sh
+
+karu64-rva23s64-dtb:
+	DTB_VARIANT=rva23s64-ddr ./scripts/build-karu64-dtb.sh
+
+karu64-rva23s64-tftp: karu64-rva23s64-linux karu64-rva23s64-dtb
+	DTB_VARIANT=rva23s64-ddr ./scripts/stage-karu64-tftp.sh
+
+karu64-rva23s64-check:
+	python3 tests/test_karu64_profile.py
 
 karu-rv64imac-check:
 	./scripts/build-karu64-rv64imac-image.sh check

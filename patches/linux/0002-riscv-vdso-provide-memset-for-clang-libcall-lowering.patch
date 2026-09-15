@@ -1,0 +1,47 @@
+From: karudeb build
+Subject: [PATCH] riscv: vdso: provide a local memset for compiler libcall lowering
+
+clang 24 (LLVM main, 2026-09) lowers the constant-size structure clear in
+__cvdso_getrandom_data() to a memset() libcall even under -fno-builtin and
+-ffreestanding. The vDSO links with no libc, so the reference becomes a
+dynamic relocation and lib/vdso's relocation check fails the build:
+
+    arch/riscv/kernel/vdso/vdso.so.dbg: dynamic relocations are not supported
+
+Provide a minimal memset in the vDSO itself, as a separate object next to
+getrandom (the only user). It is not exported from the vDSO symbol table:
+the version script in vdso.lds.S keeps everything but the __vdso_* entry
+points local. Builds whose compiler inlines the clear leave it unreferenced.
+
+--- a/arch/riscv/kernel/vdso/Makefile
++++ b/arch/riscv/kernel/vdso/Makefile
+@@ -14,6 +14,7 @@ vdso-syms += sys_hwprobe
+
+ ifdef CONFIG_VDSO_GETRANDOM
+ vdso-syms += getrandom
++vdso-syms += memset
+ endif
+
+ # Files to link into the vdso
+--- /dev/null
++++ b/arch/riscv/kernel/vdso/memset.c
+@@ -0,0 +1,19 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Minimal memset for the vDSO. Some compilers lower constant-size clears
++ * in the generic vDSO getrandom code to a memset() libcall regardless of
++ * -fno-builtin; the vDSO has no libc, so supply one here. The store is
++ * volatile so loop-idiom recognition cannot turn this loop back into a
++ * memset() call to itself. It is only reached for small fixed sizes.
++ */
++#include <linux/types.h>
++
++void *memset(void *s, int c, size_t n);
++void *memset(void *s, int c, size_t n)
++{
++	volatile unsigned char *p = s;
++
++	while (n--)
++		*p++ = (unsigned char)c;
++	return s;
++}
