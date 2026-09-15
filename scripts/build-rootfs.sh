@@ -62,6 +62,7 @@ KARUDEB_TARGET_STATIC="${KARUDEB_TARGET_STATIC:-0}"
 KARUDEB_OPENSSL_ZVK_BENCH="${KARUDEB_OPENSSL_ZVK_BENCH:-1}"
 KARUDEB_OPENSSL_ZVK_KAT="${KARUDEB_OPENSSL_ZVK_KAT:-1}"
 KARUDEB_ZVKNHK_OPENSSL="${KARUDEB_ZVKNHK_OPENSSL:-1}"
+KARUDEB_BOARD_ACCEPT="${KARUDEB_BOARD_ACCEPT:-1}"
 KARUDEB_ZVKNHK_DIR="${KARUDEB_ZVKNHK_DIR:-$PROJECT_ROOT/build/zvknhk}"
 
 DEFAULT_PACKAGES="sysvinit-core,sysv-rc,ifupdown,iproute2,netbase,openssh-server,sudo,procps,psmisc,iputils-ping,ca-certificates,busybox-static"
@@ -212,7 +213,7 @@ configure_built_rootfs() {
       export KARUDEB_PERF_USER_ACCESS KARUDEB_PERF_EVENT_PARANOID
       export KARUDEB_PERF_RUN KARUDEB_PERF_RUN_CC KARUDEB_TARGET_CC KARUDEB_TARGET_SYSROOT KARUDEB_TARGET_STATIC
       export KARUDEB_OPENSSL_ZVK_BENCH KARUDEB_OPENSSL_ZVK_KAT
-      export KARUDEB_ZVKNHK_OPENSSL KARUDEB_ZVKNHK_DIR
+      export KARUDEB_ZVKNHK_OPENSSL KARUDEB_ZVKNHK_DIR KARUDEB_BOARD_ACCEPT
       unshare --map-auto --setuid 0 --setgid 0 "$SCRIPT_DIR/build-rootfs.sh" || status=$?
       rm -f "$staged_ssh_host_key" "$staged_ssh_host_pub"
       return "$status"
@@ -615,6 +616,57 @@ configure_openssl_zvk_kat() {
 # under build/zvknhk. They are static, so the rootfs needs no development
 # packages for them. The patched openssl lives under its own prefix and does
 # not replace the Debian openssl used by openssl_zvk_bench.
+# Board acceptance probes: a static helper (userspace DDR pattern test and a
+# KVM API smoke test) plus the driver script that runs the handoff checklist
+# on the target. Built with the same target compiler as perf_run.
+configure_board_accept() {
+  local cc out src script
+  local -a static_args
+
+  [[ "$KARUDEB_BOARD_ACCEPT" == "1" ]] || return 0
+  if [[ "$ARCH" != "riscv64" ]]; then
+    info "Skipping board_accept: only riscv64 rootfs is supported"
+    return 0
+  fi
+
+  src="$PROJECT_ROOT/tools/board_accept.c"
+  script="$PROJECT_ROOT/tools/board_accept.sh"
+  [[ -f "$src" ]] || die "missing board_accept source: $src"
+  [[ -f "$script" ]] || die "missing board_accept script: $script"
+  cc="$(select_target_cc)" || \
+    die "missing riscv64 Linux target compiler for board_accept; install clang/lld or set KARUDEB_BOARD_ACCEPT=0"
+
+  out="$(mktemp)"
+  static_args=()
+  if [[ "$KARUDEB_TARGET_STATIC" == "1" ]]; then
+    static_args=(-static)
+  fi
+  target_compile "$cc" -Wall -Wextra -O2 "${static_args[@]}" -march=rv64gc -mabi=lp64d "$src" -o "$out"
+  rootfs_cmd install -D -m 0755 "$out" "$ROOTFS_DIR/usr/local/bin/board_accept"
+  rootfs_cmd install -D -m 0755 "$script" "$ROOTFS_DIR/usr/local/bin/board_accept.sh"
+
+  # vsetvl reserved-vtype regression (needs V at compile time only for the
+  # inline asm; it runs anywhere with V).
+  src="$PROJECT_ROOT/tools/vill_probe.c"
+  [[ -f "$src" ]] || die "missing vill_probe source: $src"
+  target_compile "$cc" -Wall -O1 "${static_args[@]}" -march=rv64gcv -mabi=lp64d "$src" -o "$out"
+  rootfs_cmd install -D -m 0755 "$out" "$ROOTFS_DIR/usr/local/bin/vill_probe"
+
+  # Cache-coverage regression: fetch and load cost must not depend on the
+  # physical page's position in DRAM.
+  src="$PROJECT_ROOT/tools/cache_window_probe.c"
+  [[ -f "$src" ]] || die "missing cache_window_probe source: $src"
+  target_compile "$cc" -Wall -Wno-misleading-indentation -O1 "${static_args[@]}" -march=rv64gc -mabi=lp64d "$src" -o "$out"
+  rootfs_cmd install -D -m 0755 "$out" "$ROOTFS_DIR/usr/local/bin/cache_window_probe"
+
+  # Resident-state SHAKE absorb/squeeze microbenchmark (vkeccak.vi, VLEN=256).
+  src="$PROJECT_ROOT/tools/shake_bench.c"
+  [[ -f "$src" ]] || die "missing shake_bench source: $src"
+  target_compile "$cc" -Wall -Wno-unused-but-set-variable -O2 "${static_args[@]}" -march=rv64gcv_zvl256b -mabi=lp64d "$src" -o "$out"
+  rootfs_cmd install -D -m 0755 "$out" "$ROOTFS_DIR/usr/local/bin/shake_bench"
+  rm -f "$out"
+}
+
 configure_zvknhk_openssl() {
   local src
 
@@ -1118,6 +1170,7 @@ EOF
   configure_openssl_zvk_bench
   configure_openssl_zvk_kat
   configure_zvknhk_openssl
+  configure_board_accept
   configure_karudeb_user "$shared_ssh_authorized_keys"
 
   write_rootfs_file etc/apt/apt.conf.d/99karudeb-no-recommends <<'EOF'
@@ -1149,7 +1202,7 @@ EOF
  / /|_/ / _ \`/ _ \(_-</ -_) / ___/ __/ _ \/ __/ -_|_-<(_-</ _ \/ __(_-<
 /_/  /_/\_,_/_//_/___/\__/ /_/  /_/  \___/\__/\__/___/___/\___/_/ /___/
     __ __                 _____ __ __
-   / //_/___ ________  __/ ___// // /  RVA23U64 User Application Profile
+   / //_/___ ________  __/ ___// // /  RVA23S64 Application Processor
   / ,< / __ \`/ ___/ / / / __ \/ // /_  Full RVV 1.0 Vector, VLEN=256
  / /| / /_/ / /  / /_/ / /_/ /__  __/  Full Zvk Vector Crypto Features
 /_/ |_\__,_/_/   \__,_/\____/  /_/     + PQC TG Vector Keccak Extension

@@ -28,6 +28,10 @@ TFTP_RETRIES="${TFTP_RETRIES:-3}"
 
 KERNEL_ADDR="${KERNEL_ADDR:-0x80200000}"
 case "$DTB_VARIANT" in
+  rva23s64|rva23s64-ddr)
+    DTB_VARIANT="rva23s64-ddr"
+    DTB_ADDR="${DTB_ADDR:-0x84000000}"
+    ;;
   zvk|zvk-ddr|vector-crypto|vector-crypto-ddr)
     DTB_VARIANT="zvk-ddr"
     DTB_ADDR="${DTB_ADDR:-0x84000000}"
@@ -45,12 +49,15 @@ case "$DTB_VARIANT" in
     DTB_ADDR="${DTB_ADDR:-0x81300000}"
     ;;
   *)
-    die "DTB_VARIANT must be 'zvk-ddr', 'rv64gc-ddr', 'ddr', or 'sim'"
+    die "DTB_VARIANT must be 'rva23s64-ddr', 'zvk-ddr', 'rv64gc-ddr', 'ddr', or 'sim'"
     ;;
 esac
 
 if [[ -z "$KERNEL" ]]; then
   case "$DTB_VARIANT" in
+    rva23s64-ddr)
+      KERNEL="$PROJECT_ROOT/build/linux-riscv64-karu64-rva23s64/arch/riscv/boot/Image"
+      ;;
     rv64gc-ddr)
       KERNEL="$PROJECT_ROOT/build/linux-riscv64-karu64-rv64gc/arch/riscv/boot/Image"
       ;;
