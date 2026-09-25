@@ -3,7 +3,8 @@
 # board_accept -- acceptance checks for a freshly programmed karu64 board,
 # run natively on the target after it reaches userspace. Covers the list in
 # the karu64 VCU118 handoff: NFS root, Ethernet, kernel version, advertised
-# ISA, /dev/kvm, memory, crypto known answers, and the benchmark counters.
+# ISA, /dev/kvm, memory, crypto known answers, and the benchmark counters,
+# plus the vector and scalar-FP probes kept as per-bitstream regressions.
 #
 # Usage: board_accept [--expect-isa EXT,EXT,...] [--mem MiB] [--out DIR]
 #
@@ -140,6 +141,18 @@ if [[ -n "$vvp" ]]; then
   if [[ "$(id -u)" -ne 0 ]]; then
     echo "     (validate_v_ptrace needs root for ptrace; skipped)"
   elif "$vvp" >"$OUT_DIR/validate_v_ptrace.txt" 2>&1; then ok "validate_v_ptrace: $(grep -c '^ok' "$OUT_DIR/validate_v_ptrace.txt") cases incl. syscall clobbering"; else fail "validate_v_ptrace: $(grep '^not ok' "$OUT_DIR/validate_v_ptrace.txt" | tr '\n' ' ')"; fi
+fi
+
+echo "== floating point (scalar FP cycle costs, informational)"
+if command -v fp_probe >/dev/null 2>&1; then
+  # Informational: scalar FP cycle costs, recorded so a bitstream change in the
+  # FP datapath (register file, multiplier knobs) is visible release to release.
+  if perf_run --user-count -- "$(command -v fp_probe)" >"$OUT_DIR/fp_probe.txt" 2>&1; then
+    ok "fp_probe: $(awk '/dependent \(latency\)/ {printf "%s %s  ", $1, $(NF-1)} END {print "cycles/op (latency)"}' "$OUT_DIR/fp_probe.txt")"
+    grep -E '^(--|  f)' "$OUT_DIR/fp_probe.txt" | sed 's/^/     /'
+  else
+    fail "fp_probe: $(tail -1 "$OUT_DIR/fp_probe.txt")"
+  fi
 fi
 
 echo

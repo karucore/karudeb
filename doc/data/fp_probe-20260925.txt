@@ -1,0 +1,29 @@
+=== fp_probe (FRF read-port pressure) ===
+[fp_probe: 20000 iterations, best of 5; dependent loops 16 ops/iter, independent loops 256]
+-- double precision
+  fmadd.d dependent (latency)          66.914 cycles/op
+  fmadd.d independent x8               65.883 cycles/op
+  fmul.d  independent x8               62.715 cycles/op
+  fadd.d  independent x8                6.932 cycles/op
+  fmul.d  dependent (latency)          62.979 cycles/op
+  fadd.d  dependent (latency)           8.113 cycles/op
+  fdiv.d  independent x4               63.775 cycles/op
+  fsqrt.d independent x8               62.732 cycles/op
+  fsgnj.d independent x8                5.329 cycles/op
+-- single precision
+  fmadd.s dependent (latency)          13.189 cycles/op
+  fmadd.s independent x8               12.776 cycles/op
+  fmul.s  independent x8               10.707 cycles/op
+-- memory side (for reference)
+  fld     independent x8                7.528 cycles/op
+
+An FMA reads three registers, fmul/fadd read two. If the register
+file cannot supply three operands in one cycle, the independent
+fmadd figure exceeds the independent fmul figure by about a cycle.
+
+=== testfloat timing calibration: f64_mul, level 1 ===
+In 46464 tests, no errors found in f64_mul, rounding max.
+
+real	0m30.226s
+user	0m27.159s
+sys	0m0.580s

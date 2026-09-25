@@ -659,6 +659,13 @@ configure_board_accept() {
   target_compile "$cc" -Wall -Wno-misleading-indentation -O1 "${static_args[@]}" -march=rv64gc -mabi=lp64d "$src" -o "$out"
   rootfs_cmd install -D -m 0755 "$out" "$ROOTFS_DIR/usr/local/bin/cache_window_probe"
 
+  # Scalar FP latency/throughput probe: fmadd reads three registers and fmul
+  # two, so the gap between them bounds the third-operand read cost.
+  src="$PROJECT_ROOT/tools/fp_probe.c"
+  [[ -f "$src" ]] || die "missing fp_probe source: $src"
+  target_compile "$cc" -Wall -Wextra -O2 "${static_args[@]}" -march=rv64gc -mabi=lp64d "$src" -o "$out"
+  rootfs_cmd install -D -m 0755 "$out" "$ROOTFS_DIR/usr/local/bin/fp_probe"
+
   # Resident-state SHAKE absorb/squeeze microbenchmark (vkeccak.vi, VLEN=256).
   src="$PROJECT_ROOT/tools/shake_bench.c"
   [[ -f "$src" ]] || die "missing shake_bench source: $src"
