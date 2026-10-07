@@ -20,7 +20,11 @@ CFLAGS	+=	-DMLDSA_RVV=$(MLDSA_RVV)
 LDFLAGS	+=	-static --sysroot=$(RISCV)/sysroot/usr
 LDLIBS	+=
 
-#	maximum isa string for spike
+#	maximum isa string for spike. vkeccak.vi follows the Zvknhk element-group
+#	rules; point SPIKE at a simulator that implements them, e.g.
+#	SPIKE=../../../../riscv-pqc/zvknhk/riscv-isa-sim/build/spike
+SPIKE	?=	spike
+PK		?=	pk
 SPIKEFL	=	--isa=rv64gcv_zbb_zvbb_zvbc_zvkg_zvkned_zvknhb_zvksed_zvksh_zvl256b_zvknhk_zicntr_zihpm
 
 #	xtest
@@ -28,10 +32,10 @@ $(XBIN):	$(OBJS)
 	$(CC) $(LDFLAGS) $(CFLAGS) -o $(XBIN) $(OBJS) $(LDLIBS)
 
 run:	$(XBIN)
-	spike $(SPIKEFL) pk -p $(XBIN)
+	$(SPIKE) $(SPIKEFL) $(PK) -p $(XBIN)
 
 kat:	$(XBIN)
-	spike $(SPIKEFL) pk $(XBIN) refkat/ml-dsa-kat.txt
+	$(SPIKE) $(SPIKEFL) $(PK) $(XBIN) refkat/ml-dsa-kat.txt
 
 %.o:	%.[csS]
 	$(CC) $(CFLAGS) -c $^ -o $@

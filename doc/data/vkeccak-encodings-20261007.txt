@@ -1,0 +1,36 @@
+== vkeccak.vi encoding conformance, VLEN=256, native
+  ok   case 0  legal     m8 vl=32 vd=v0
+  ok   case 1  legal     m8 vl=VLMAX vd=v8
+  ok   case 2  legal     m8 vl=VLMAX vd=v24
+Illegal instruction
+  ok   case 3  illegal   (trapped)
+Illegal instruction
+  ok   case 4  illegal   (trapped)
+Illegal instruction
+  ok   case 5  illegal   (trapped)
+Illegal instruction
+  ok   case 6  illegal   (trapped)
+  ok   case 7  legal     >=vl)
+  ok   case 8  legal     m8 vl=0
+Illegal instruction
+  ok   case 9  illegal   (trapped)
+Illegal instruction
+  ok   case 10 illegal   (trapped)
+Illegal instruction
+  ok   case 11 illegal   (trapped)
+Illegal instruction
+  ok   case 12 illegal   (trapped)
+Illegal instruction
+  ok   case 13 illegal   (trapped)
+  ok   case 14 legal     m8 vd=v16
+Illegal instruction
+  ok   case 15 illegal   (trapped)
+  ok   case 16 legal     m8 vl=VLMAX vstart=32
+Illegal instruction
+  ok   case 17 illegal   (trapped)
+Illegal instruction
+  ok   case 18 illegal   (trapped)
+Illegal instruction
+  ok   case 19 illegal   (trapped)
+== 20/20 encodings behave as specified
+edge_rc=0

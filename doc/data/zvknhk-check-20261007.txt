@@ -1,0 +1,33 @@
+== Zvknhk OpenSSL benchmark ==
+OpenSSL:  /usr/local/openssl-zvknhk/bin/openssl
+          OpenSSL 4.0.2 25 Aug 2026 (Library: OpenSSL 4.0.2 25 Aug 2026)
+          auto-detected OPENSSL_riscvcap=RV64GC_ZBA_ZBB_ZBS_ZKT_V_ZVBB_ZVKB_ZVKG_ZVKNED_ZVKNHA_ZVKNHB_ZVKSED_ZVKSH vlen:256
+pqcbench: /usr/local/bin/pqcbench
+perf_run: /usr/local/bin/perf_run --user-count (fixed counters kept running, user-only)
+caps:     vkeccak=rv64gc_v_zvknhk software=rv64gc
+kernel:   7.2.6-zvk
+isa:      rv64imafdcvh_zicbom_zicbop_zicboz_zicntr_zicond_zicsr_zifencei_zihintntl_zihintpause_zihpm_zimop_zaamo_zalrsc_zawrs_zfa_zfhmin_zca_zcb_zcd_zcmop_zba_zbb_zbs_zkt_zvbb_zve32f_zve32x_zve64d_zve64f_zve64x_zvfhmin_zvkb_zvkg_zvkned_zvknha_zvknhb_zvksed_zvksh_zvkt_smnpm_smstateen_sscofpmf_ssnpm_sstc_svade_svinval_svnapot_svpbmt
+dtb:      karu,vkeccak present
+counters: kernel.perf_user_access=2
+output:   /root/accept-keccak-20261007/zvknhk
+
+== checks ==
+  ok   sha3-256             (vkeccak)
+  ok   sha3-512             (vkeccak)
+  ok   shake128 -xoflen 32  (vkeccak)
+  ok   shake256 -xoflen 32  (vkeccak)
+  ok   shake128 -xoflen 200 (vkeccak)
+  ok   shake256 -xoflen 200 (vkeccak)
+  ok   ML-KEM-768 keygen/encap/decap (vkeccak)
+  ok   ML-DSA-65 keygen/sign/verify (vkeccak)
+  ok   sha3-256             (software)
+  ok   sha3-512             (software)
+  ok   shake128 -xoflen 32  (software)
+  ok   shake256 -xoflen 32  (software)
+  ok   shake128 -xoflen 200 (software)
+  ok   shake256 -xoflen 200 (software)
+  ok   ML-KEM-768 keygen/encap/decap (software)
+  ok   ML-DSA-65 keygen/sign/verify (software)
+  ok   ML-KEM/ML-DSA fingerprints agree across both backends
+
+zvknhk_bench: done (results in /root/accept-keccak-20261007/zvknhk)

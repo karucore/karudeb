@@ -194,9 +194,11 @@ echo
 # ------------------------------------------------------------------ probe ---
 #
 # Run the smallest thing that executes vkeccak.vi. Exit status 132 is
-# 128+SIGILL: the CPU does not implement the instruction, or implements a
-# different encoding. Anything else nonzero is a different failure and is
-# fatal, since it would make every later result meaningless.
+# 128+SIGILL: the CPU does not implement the instruction, implements a
+# different encoding, or implements different operand rules (an OpenSSL built
+# for the earlier fixed-group form issues it at vl=25, which the element-group
+# form reserves). Anything else nonzero is a different failure and is fatal,
+# since it would make every later result meaningless.
 
 HAVE_VK=1
 st=0
@@ -204,7 +206,8 @@ ossl "$CAP" dgst -sha3-256 /dev/null >"$OUT_DIR/logs/probe.log" 2>&1 || st=$?
 if [[ "$st" -eq 132 ]]; then
   HAVE_VK=0
   echo "vkeccak.vi trapped with SIGILL under OPENSSL_riscvcap=$CAP."
-  echo "This CPU does not implement Zvknhk with the encoding this OpenSSL uses;"
+  echo "This CPU does not implement Zvknhk with the encoding and element-group"
+  echo "rules this OpenSSL uses (see /usr/local/openssl-zvknhk/VERSION);"
   if [[ "$REQUIRE_ZVKNHK" == "1" ]]; then
     echo "--require-zvknhk given, stopping."
     exit 1

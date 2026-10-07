@@ -1,14 +1,27 @@
 // shake_bench.c -- resident-state SHAKE absorb/squeeze cycles on the board.
 //
 // Linux userspace port of karu64's test/fw/keccak_bench.c, the "Resident
-// vkeccak" row of the paper's SHAKE table. The measured loops are byte for
-// byte the firmware's: the 1600-bit state stays in v0..v7 across blocks;
-// absorb loads one rate block into v8.., XORs it in and permutes; squeeze
-// stores one rate block from the state and permutes. Rates 168 B (SHAKE128,
-// vl=21) and 136 B (SHAKE256, vl=17). No per-block state reload/writeback,
-// which is what the ML-KEM/ML-DSA wrapper pays and this does not.
+// vkeccak" row of the paper's SHAKE table. Each block performs the same
+// vector operations in the same order as the firmware: the 1600-bit state
+// stays in v0..v7 across blocks; absorb loads one rate block into v8.., XORs
+// it in and permutes; squeeze stores one rate block from the state and
+// permutes. Rates 168 B (SHAKE128, vl=21) and 136 B (SHAKE256, vl=17). No
+// per-block state reload/writeback, which is what the ML-KEM/ML-DSA wrapper
+// pays and this does not.
 //
-// Cycles come from rdcycle around N unrolled iterations. On karu64 the fixed
+// The loop structure differs from the firmware, which matters when comparing
+// cycle figures: the firmware unrolls 16 blocks with .rept, so its per-block
+// cost has no loop control, while this is a counted loop that adds one
+// decrement and one taken branch per block (and runs under Linux, with the
+// instruction cache and the timer tick).
+//
+// vkeccak.vi follows the Zvknhk element-group rules: it runs at e64,m8,vl=32
+// (one 2048-bit element group; the only legal shape at VLEN=256), so every
+// block switches vl from the rate to 32 for the permutation and back. t0
+// holds 32 for the register-form vsetvli. Issuing the instruction at the
+// rate vl is reserved and traps on a conforming implementation.
+//
+// Cycles come from rdcycle around the N-iteration loop. On karu64 the fixed
 // counters only advance while a perf event holds them open, and they count
 // all privilege modes unless the event excludes the kernel, so run under
 // `perf_run --user-count --`. N is larger than the firmware's 16 so the
@@ -22,12 +35,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define VCLOBBERS "memory", "vl", "vtype", \
+#define VCLOBBERS "memory", "vl", "vtype", "t0", \
     "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", \
     "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15"
 
 /* vkeccak.vi v0, 0 : .insn r 0x77, 0x2, 0x53, x0, x18, x0 */
 #define VKECCAK24 ".word 0xa6092077\n"
+/* e64,m8,vl=32: one element group. t0 must hold 32. */
+#define VL32 "vsetvli x0,t0,e64,m8,tu,mu\n"
 
 static uint64_t st[32] __attribute__((aligned(64)));
 static uint64_t *in_blocks, *out_blocks;
@@ -49,12 +64,15 @@ static void warm_input(size_t words)
     __asm volatile(                                                       \
         "vsetivli x0,25,e64,m8,tu,mu\n"                                   \
         "vle64.v v0,(%[s])\n"                                             \
+        "li t0,32\n"                                                      \
         "vsetivli x0," #VL ",e64,m8,tu,mu\n"                              \
         "rdcycle %[c0]\n"                                                 \
         "1:\n"                                                            \
         "vle64.v v8,(%[p])\n"                                             \
         "vxor.vv v0,v0,v8\n"                                              \
+        VL32                                                              \
         VKECCAK24                                                         \
+        "vsetivli x0," #VL ",e64,m8,tu,mu\n"                              \
         "addi %[p],%[p]," #BYTES "\n"                                     \
         "addi %[n],%[n],-1\n"                                             \
         "bnez %[n],1b\n"                                                  \
@@ -68,11 +86,14 @@ static void warm_input(size_t words)
     __asm volatile(                                                       \
         "vsetivli x0,25,e64,m8,tu,mu\n"                                   \
         "vle64.v v0,(%[s])\n"                                             \
+        "li t0,32\n"                                                      \
         "vsetivli x0," #VL ",e64,m8,tu,mu\n"                              \
         "rdcycle %[c0]\n"                                                 \
         "1:\n"                                                            \
         "vse64.v v0,(%[p])\n"                                             \
+        VL32                                                              \
         VKECCAK24                                                         \
+        "vsetivli x0," #VL ",e64,m8,tu,mu\n"                              \
         "addi %[p],%[p]," #BYTES "\n"                                     \
         "addi %[n],%[n],-1\n"                                             \
         "bnez %[n],1b\n"                                                  \
@@ -92,6 +113,7 @@ static uint64_t perm_only(void)
     __asm volatile(
         "vsetivli x0,25,e64,m8,tu,mu\n"
         "vle64.v v0,(%[s])\n"
+        "li t0,32\n" VL32
         "rdcycle %[c0]\n"
         "1:\n" VKECCAK24 "addi %[n],%[n],-1\n" "bnez %[n],1b\n"
         "rdcycle %[c1]\n"
@@ -100,20 +122,38 @@ static uint64_t perm_only(void)
 }
 
 /* The ML-KEM/ML-DSA wrapper cost for reference: full 25-word reload and
- * writeback around every permutation. */
+ * writeback around every permutation, with the vl=25 / vl=32 / vl=25
+ * switches the element-group rules require. */
 static uint64_t wrapper(void)
 {
     uint64_t c0, c1; long n = N;
     __asm volatile(
         "vsetivli x0,25,e64,m8,tu,mu\n"
         "vle64.v v0,(%[s])\n vse64.v v0,(%[s])\n"
+        "li t0,32\n"
         "rdcycle %[c0]\n"
         "1:\n"
         "vsetivli x0,25,e64,m8,tu,mu\n"
-        "vle64.v v0,(%[s])\n" VKECCAK24 "vse64.v v0,(%[s])\n"
+        "vle64.v v0,(%[s])\n" VL32 VKECCAK24
+        "vsetivli x0,25,e64,m8,tu,mu\n"
+        "vse64.v v0,(%[s])\n"
         "addi %[n],%[n],-1\n" "bnez %[n],1b\n"
         "rdcycle %[c1]\n"
         : [c0] "=&r"(c0), [c1] "=&r"(c1), [n] "+r"(n) : [s] "r"(st) : VCLOBBERS);
+    return c1 - c0;
+}
+
+/* The two vl switches each block now pays (rate <-> 32), on their own. */
+static uint64_t vset_pair(void)
+{
+    uint64_t c0, c1; long n = N;
+    __asm volatile(
+        "li t0,32\n"
+        "rdcycle %[c0]\n"
+        "1:\n" VL32 "vsetivli x0,21,e64,m8,tu,mu\n"
+        "addi %[n],%[n],-1\n" "bnez %[n],1b\n"
+        "rdcycle %[c1]\n"
+        : [c0] "=&r"(c0), [c1] "=&r"(c1), [n] "+r"(n) : : VCLOBBERS);
     return c1 - c0;
 }
 
@@ -122,7 +162,7 @@ static void report(const char *name, uint64_t (*fn)(void))
     uint64_t best = UINT64_MAX;
     fn();                                       /* warm */
     for (unsigned r = 0; r < REPS; r++) { uint64_t c = fn(); if (c < best) best = c; }
-    printf("%-34s %8.2f cycles/block  (best of %u x %u blocks)\n",
+    printf("%-48s %8.2f cycles/block  (best of %u x %u blocks)\n",
            name, (double)best / N, REPS, N);
 }
 
@@ -146,7 +186,8 @@ int main(int argc, char **argv)
     printf("[shake_bench: resident-state vkeccak.vi, VLEN=%lu bits, N=%u, REPS=%u]\n",
            ({ unsigned long vlenb; __asm volatile("csrr %0,0xc22" : "=r"(vlenb)); vlenb * 8; }), N, REPS);
     report("vkeccak.vi 24-round, VRF resident", perm_only);
-    report("wrapper: vset+vle64+vkeccak+vse64", wrapper);
+    report("wrapper: vset25+vle64+vset32+vkeccak+vset25+vse64", wrapper);
+    report("vl switch pair (32 <-> rate), loop only", vset_pair);
     report("absorb 168 B (SHAKE128)", absorb168);
     report("absorb 136 B (SHAKE256)", absorb136);
     report("squeeze 168 B (SHAKE128)", squeeze168);

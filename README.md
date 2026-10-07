@@ -43,7 +43,10 @@ This is intentionally separate from the root-owned NFS export used for hardware.
 - `initramfs/karu64-rv64imac/`: files copied into the reduced RV64IMAC
   initramfs image.
 - `tools/`: benchmark helpers installed into the rootfs, including the
-  on-target `zvknhk_bench` runner for the Zvknhk OpenSSL benchmark.
+  on-target `zvknhk_bench` runner for the Zvknhk OpenSSL benchmark, and
+  `vkeccak_encodings.sh`, which is run by hand (see below).
+- `doc/`: measurement records for the bitstreams this repository has booted,
+  with the raw tool output under `doc/data/`.
 - `patches/`: Linux patches applied by `scripts/build-linux.sh`. Patches in
   `patches/linux/` apply to every kernel version and the build fails if one
   does not apply; `patches/linux-<version>/` holds version-specific ones.
@@ -56,7 +59,7 @@ Before committing a release tree, run:
 
 ```sh
 make -n clean
-bash -n scripts/*.sh
+bash -n scripts/*.sh tools/*.sh
 sh -n initramfs/karu64-rv64imac/init initramfs/karu64-rv64imac/udhcpc.script configs/rootfs-init-tmpfs-nosed.sh
 ```
 
@@ -405,8 +408,24 @@ Logs plus `kat.csv`, `cycles.csv`, and `speed.csv` are written under the
 printed output directory. Zvknhk has no hwprobe key, so `OPENSSL_riscvcap` is
 the only way the patched OpenSSL enables the instruction, and the `_v_` needs
 its own underscore. If `vkeccak.vi` traps with SIGILL, for example on a
-bitstream that still implements the older encoding, the script says so and
-runs the software path only; pass `--require-zvknhk` to fail instead.
+bitstream that still implements the older encoding, or when binaries built
+for the earlier fixed-group rules meet a bitstream with the element-group
+rules described below, the script says so and runs the software path only;
+pass `--require-zvknhk` to fail instead.
+
+`vkeccak.vi` follows the Zvknhk element-group rules (riscv-pqc `main` at
+`3c40d18` and later; `15ea9cb`, which a `build/zvknhk/VERSION` from before the
+merge records, is the same tree; and karu64 from its `dev-keccak` change): at
+VLEN=256 the instruction
+is legal only at `e64,m8` with `vl` a multiple of 32, so software loads the
+25 state words at `vl=25`, sets `vl=32` for the permutation and returns to
+`vl=25` to store. Issuing it at `vl=25`, as every earlier build of these
+tools did, raises SIGILL on such an implementation. The OpenSSL backend comes
+from riscv-pqc, so `make zvknhk-openssl` after updating that checkout picks
+the new sequence up; `build/zvknhk/VERSION` records the riscv-pqc commit.
+Rebuild and restage the rootfs before programming a bitstream with the new
+rules. The new sequence also runs on the earlier fixed-group bitstreams,
+which ignored `vl`, so the software can be deployed first.
 
 The same binaries can be driven by hand:
 
@@ -453,8 +472,15 @@ OpenSSL has no vector lattice arithmetic, so its speedup from `vkeccak.vi` is
 the Keccak share alone, while these show the instruction combined with
 vectorised NTT and sampling. Their Keccak wrapper was ported to the
 specification encoding (`vd = v0`, `x18` fixed field, `imm5 = 0`; the old
-`x17`/`x24` form traps on the current bitstream), and all variants pass their
-ACVP known-answer files for every parameter set.
+`x17`/`x24` form traps on the current bitstream) and to the element-group
+rules (`e64,m8`, `vl=32` around the instruction, `vl=25` for the state load
+and store; the fixed 16-register group at VLEN=128). All variants pass their
+ACVP known-answer files for every parameter set at VLEN=256; the
+`rv64gcv_vkec` variant also passes at VLEN=128 and 512, while the
+hand-written intrinsics variants are specific to VLEN=256 with or without
+the Keccak instruction. `tools/shake_bench.c`, the resident-state SHAKE
+microbenchmark, switches `vl` between the rate and 32 around every
+permutation for the same reason.
 
 They build with the `riscv64-unknown-linux-gnu-clang` toolchain and `$RISCV`:
 
@@ -464,7 +490,19 @@ cd tools/pqc/mldsa && RUN=0 ./test_matrix.sh    # xmldsa.<variant> binaries
 ```
 
 Without `RUN=0` each variant is also run under Spike with `pk`, using the
-`zvknhk` extension name. The variants are `rv64gc`, `rv64gc_zbb`, `rv64gcv`,
+`zvknhk` extension name; `SPIKE=` and `PK=` select the simulator and proxy
+kernel, and the riscv-pqc reference build
+(`SPIKE=../../../../riscv-pqc/zvknhk/riscv-isa-sim/build/spike`) is the one
+that implements the element-group rules. The known-answer files can also be
+run under riscv-pqc's user-mode QEMU, which needs no proxy kernel:
+
+```sh
+../../../../riscv-pqc/zvknhk/qemu-src/build/qemu-riscv64 \
+  -cpu rv64,v=true,vlen=256,elen=64,zvknhk=true \
+  ./xmlkem.rv64gcv_intr_vkec refkat/ml-kem-kat.txt
+```
+
+The variants are `rv64gc`, `rv64gc_zbb`, `rv64gcv`,
 `rv64gcv_zbb`, `rv64gcv_intr_zbb` (intrinsics), `rv64gcv_vkec` (Keccak
 instruction) and `rv64gcv_intr_vkec` (both). On the board, copy the binaries
 and the `refkat` directory into the export and run them under `perf_run` so
@@ -851,9 +889,15 @@ only the DTB and netboot command per hardware variant:
 Reduced IMAC ROM DTB: build/karu64/karu64-rv64imac-ddr.dtb
 RV64GC ROM DTB:       build/karu64/karu64-rv64gc-ddr.dtb
 RVA23/Zvk ROM DTB:    build/karu64/karu64-zvk-ddr.dtb
+RVA23S64 ROM DTB:     build/karu64/karu64-rva23s64-ddr.dtb
 RV64GC netboot:       build/karu64/tftp/rv64gc-ddr/uboot-netboot-one-line.txt
 RVA23/Zvk netboot:    build/karu64/tftp/zvk-ddr/uboot-netboot-one-line.txt
+RVA23S64 netboot:     build/karu64/tftp/rva23s64-ddr/uboot-netboot-one-line.txt
 ```
+
+These files are read on the host that builds the bitstream, which need not be
+the host that serves TFTP and NFS to the board. See
+[Bitstream built on another host](#bitstream-built-on-another-host).
 
 For the release RVA23/Zvk Debian `riscv64` NFS-root profile, build and stage
 the matching rootfs, kernel, and DTB explicitly:
@@ -1069,6 +1113,98 @@ UART boot log on hardware: the processor's 2872/2872 ACT4 passes on both
 profile models are architectural regression evidence, not a board-boot or
 KVM-guest verdict for this Linux image.
 
+#### Bitstream built on another host
+
+When the bitstream is implemented on a different machine from the one wired
+to the board, the ROM contents and the served files come from two separate
+checkouts of this repository:
+
+- The **bitstream build host** bakes OpenSBI, U-Boot with its boot command,
+  and the control DTB into the ROM. The boot command is its own
+  `build/karu64/tftp/rva23s64-ddr/uboot-netboot-one-line.txt`, so that host
+  must stage with the lab addresses although it serves nothing. The staging
+  defaults (`192.168.1.20` / `192.168.1.10`) are not the lab network.
+- The **board host** serves `Image` and `board.dtb` from its TFTP root and the
+  root filesystem over NFS. Its own one-liner is not used by the board.
+
+For the baked command to work, the board host must provide exactly what it
+names: TFTP server `192.168.42.1`, board `192.168.42.10`, files `Image` and
+`board.dtb` at the TFTP root, and the NFS export
+`192.168.42.1:/srv/nfs/karudeb` (`vers=3,tcp,nolock`).
+
+The processor repository's programming bundle
+(`make vcu118-program-bundle` there) carries two files read back from the
+ROM: `_build/vcu118_rom_manifest.txt`, with the baked boot command and the
+hash of every ROM blob, and `_build/vcu118_rom_board.dtb`, the control DTB
+itself. Stage into the live TFTP root with that DTB, where `$KARU64` is the
+processor checkout the bundle was extracted in:
+
+```sh
+DTB=$KARU64/_build/vcu118_rom_board.dtb \
+  TFTP_SERVER=192.168.42.1 GUEST_IP=192.168.42.10 \
+  NFS_SERVER=192.168.42.1 NFSROOT=/srv/nfs/karudeb TFTP_ROOT=/srv/tftp \
+  make karu64-rva23s64-tftp
+sha256sum /srv/tftp/board.dtb
+```
+
+The requirement is on the served file: `sha256sum /srv/tftp/board.dtb` must
+equal the `control DTB` line of the manifest. With `DTB=` the staging script
+serves the given file instead of the one it compiles, so this holds by
+construction.
+
+`make karu64-rva23s64-check` is a separate source check. It recompiles the
+DTS with the local `dtc` and prints `profile DTB sha256=...` for that fresh
+compile. A match with the manifest means this checkout and `dtc` reproduce
+the ROM DTB. A mismatch means the checkout or the `dtc` differs from the
+build host's, and copying a DTB cannot change what the check prints. It does
+not block booting while the served file is the bundled one, but a locally
+compiled DTB must not be served until the difference is understood.
+
+For a bitstream with the element-group `vkeccak.vi` rules, rebuild the
+software on the board host from this branch before programming, in this
+order:
+
+```sh
+git -C ../riscv-pqc pull                      # main at 3c40d18 or later
+git -C ../riscv-pqc submodule update --init zvknhk/demo/openssl
+make zvknhk-openssl                           # build/zvknhk/VERSION names the commit
+```
+
+Then rebuild, package, install and export the root filesystem with the
+release commands under [karu64 Ethernet/NFS Boot](#karu64-ethernetnfs-boot)
+(`build-rootfs.sh` with its `EXTRA_PACKAGES`, `package-rootfs.sh`,
+`install-nfs-root.sh`, `export-nfs-root.sh`).
+`build-rootfs.sh` compiles `shake_bench` and `fp_probe` and installs the
+Zvknhk OpenSSL from `build/zvknhk`. Three things it does not build, which
+still carry the old `vl=25` sequence if they were copied into the export
+earlier, are the `tools/pqc` binaries (`RUN=0 ./test_matrix.sh` in `mlkem` and
+`mldsa`), the riscv-pqc `xtest` that `board_accept.sh` runs when it finds one
+in its working directory (`make` in `../riscv-pqc/zvknhk/test`), and anything
+left in a home directory. Old copies take SIGILL on the new bitstream. The new
+software also runs on the earlier bitstreams, so it can be deployed before
+programming.
+
+Because `install-nfs-root.sh FORCE=1` replaces the whole export, the simplest
+way to keep those three current is to stage them into the rootfs tree before
+packaging, so the tarball carries them and no stale copy can survive. The tree
+is shifted-owned when `build-rootfs.sh` ran unprivileged, so write as the
+mapped root:
+
+```sh
+unshare --map-auto --setuid 0 --setgid 0 sh -c '
+  install -D -m 0755 ../riscv-pqc/zvknhk/test/xtest build/rootfs/root/xtest
+  install -d -m 0755 build/rootfs/root/pqc
+  install -m 0755 tools/pqc/mlkem/xmlkem.rv64* tools/pqc/mldsa/xmldsa.rv64* \
+    build/rootfs/root/pqc/
+  install -m 0644 tools/pqc/mlkem/refkat/ml-kem-kat.txt \
+    tools/pqc/mldsa/refkat/ml-dsa-kat.txt build/rootfs/root/pqc/'
+```
+
+The KAT files matter: `xmlkem`/`xmldsa` with no argument only benchmark, and
+`do_bench()` returns 0 unconditionally, so a zero exit from that path means the
+code did not trap and verifies nothing. Correctness comes from passing the KAT
+file, which reports `PASS=`/`FAIL=` per parameter set.
+
 See the processor's [FPGA boot procedure](../karu64/doc/fpga.md#opt-in-rva23s64-boot-selection)
 for programming. After any new bitstream boots, run `board_accept.sh` as root
 on the target: it checks the NFS root, Ethernet, kernel, the advertised ISA
@@ -1076,8 +1212,25 @@ leaves against the DTB, KVM VM/vCPU creation, memory, the benchmark counters,
 the crypto known answers, and the vector ABI and cache-coverage regressions
 (`vill_probe` must pass all six `vsetvl` encodings, `cache_window_probe` must
 see equal fetch and load cost on both sides of the 256 MiB boundary,
-`validate_v_ptrace` must pass 6/6). The rootfs builder installs the script,
-its helper and both probes from `tools/`.
+`validate_v_ptrace` must pass 6/6). It also reports `fp_probe`'s scalar FP
+cycle costs, which are informational but recorded per bitstream, and runs
+`xtest` when one is present. The rootfs builder installs the script, its
+helper and the probes from `tools/`.
+
+Known answers do not test a change to the *legality* rules, so after a
+bitstream that changes them run the encoding sweep too. `tools/vkeccak_encodings.sh`
+is the native counterpart of riscv-pqc's `run_edge_cases.sh`, which only
+understands Spike and QEMU verdicts: the same 20 encodings and the same
+per-VLEN expectations, with a trap judged by SIGILL. Copy it and
+`../riscv-pqc/zvknhk/test/edge_probe0` to the target (one binary covers every
+case, the case number is `argv[1]`) and run `./vkeccak_encodings.sh <VLEN>`.
+At VLEN=256 seven encodings must execute and thirteen must trap.
+
+Measurement records for the bitstreams booted here live in `doc/`:
+[`keccak-v02-20261007.md`](doc/keccak-v02-20261007.md) for the Zvknhk v0.2
+element-group bitstream and [`fp-datapath-20260925.md`](doc/fp-datapath-20260925.md)
+for the two-read floating-point register file, each with its raw tool output
+under `doc/data/`.
 
 ### RV64IMAC soft-float initramfs image
 

@@ -1,0 +1,65 @@
+== board_accept on karudeb at Thu Jan  1 00:10:00 UTC 1970
+Linux karudeb 7.2.6-zvk #2 SMP PREEMPT Tue Sep 15 10:33:47 EEST 2026 riscv64 GNU/Linux
+
+== root filesystem
+  ok   root is NFS: 192.168.42.1:/srv/nfs/karudeb nfs
+== ethernet
+  ok   eth0 up: 192.168.42.10/24
+  ok   NFS server 192.168.42.1 reachable (tcp/2049)
+== kernel
+  ok   kernel 7.2.6-zvk
+== ISA advertised to Linux
+     cpuinfo: rv64imafdcvh_zicbom_zicbop_zicboz_zicntr_zicond_zicsr_zifencei_zihintntl_zihintpause_zihpm_zimop_zaamo_zalrsc_zawrs_zfa_zfhmin_zca_zcb_zcd_zcmop_zba_zbb_zbs_zkt_zvbb_zve32f_zve32x_zve64d_zve64f_zve64x_zvfhmin_zvkb_zvkg_zvkned_zvknha_zvknhb_zvksed_zvksh_zvkt_smnpm_smstateen_sscofpmf_ssnpm_sstc_svade_svinval_svnapot_svpbmt
+  ok   h in DT and in cpuinfo
+  ok   smstateen in DT and in cpuinfo
+  ok   ssstateen in DT (no cpuinfo token in this kernel)
+  ok   sstc in DT and in cpuinfo
+  ok   svpbmt in DT and in cpuinfo
+  ok   svinval in DT and in cpuinfo
+  ok   svnapot in DT and in cpuinfo
+  ok   zvkb in DT and in cpuinfo
+  ok   zvknhb in DT and in cpuinfo
+  ok   zvkned in DT and in cpuinfo
+  ok   karu,vkeccak marker present
+== KVM
+  ok   /dev/kvm present
+  ok   KVM API: VM and vCPU created (guest not run)
+     kvm: ok   API version 12
+     kvm: ok   KVM_CREATE_VM
+     kvm: ok   KVM_CREATE_VCPU
+     kvm: ok   vcpu run area 8192 bytes
+     kvm: ok   (guest execution not exercised; needs a guest image)
+== memory (256 MiB userspace pattern test)
+  ok   patterns verified
+                    total        used        free      shared  buff/cache   available
+     Mem:            2001          38        1958           0          22        1963
+== benchmark counters
+  ok   perf_user_access=2
+  ok   cycle/instret counters live (probe x1.17)
+== crypto known answers (Zvknhk OpenSSL)
+  ok   zvknhk_bench --check-only: 17 checks
+  ok   riscv-pqc xtest: 39 vectors
+== vector ABI and cache coverage (vsetvl reserved vtype -> vill; cache windows; state discard across syscalls)
+  ok   vill_probe: reserved vtype requests set vill and vl=0
+  ok   cache_window_probe: fetch and load cost independent of physical placement (4.40/4.46/14.21/14.07 cyc)
+== floating point (scalar FP cycle costs, informational)
+  ok   fp_probe: fmadd.d 66.854  fmul.d 62.866  fadd.d 7.421  fmadd.s 13.161  cycles/op (latency)
+     -- double precision
+       fmadd.d dependent (latency)          66.854 cycles/op
+       fmadd.d independent x8               65.931 cycles/op
+       fmul.d  independent x8               62.716 cycles/op
+       fadd.d  independent x8                6.928 cycles/op
+       fmul.d  dependent (latency)          62.866 cycles/op
+       fadd.d  dependent (latency)           7.421 cycles/op
+       fdiv.d  independent x4               63.719 cycles/op
+       fsqrt.d independent x8               62.682 cycles/op
+       fsgnj.d independent x8                5.355 cycles/op
+     -- single precision
+       fmadd.s dependent (latency)          13.161 cycles/op
+       fmadd.s independent x8               12.826 cycles/op
+       fmul.s  independent x8               10.691 cycles/op
+     -- memory side (for reference)
+       fld     independent x8                7.445 cycles/op
+
+board_accept: PASS (results in /root/accept-keccak-20261007)
+BOARD_ACCEPT_RC=0

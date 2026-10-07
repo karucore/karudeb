@@ -1,0 +1,80 @@
+===== xmlkem.rv64gcv_vkec =====
+    cycles     insns
+    147227      1683  mlkem_poly_ntt() 2608
+    192543      2125  mlkem_poly_invntt_tomont() 1444
+       524        21  KeccakF1600_StatePermute()  6ea5537803894da3
+  ML-KEM-512              cycles     insns   f1600  iter= 100
+  ML-KEM-512  KeyGen     1386583     49048   27.02  mlkem_keygen_internal()
+  ML-KEM-512  Encaps     1918553     62701   26.02  mlkem_encaps_internal()
+  ML-KEM-512  Decaps     2747542     81332   26.02  mlkem_decaps_internal()
+  ML-KEM-768              cycles     insns   f1600  iter= 100
+  ML-KEM-768  KeyGen     2436568     95822   43.06  mlkem_keygen_internal()
+  ML-KEM-768  Encaps     3093180    110005   44.06  mlkem_encaps_internal()
+  ML-KEM-768  Decaps     4207802    135722   44.06  mlkem_decaps_internal()
+ ML-KEM-1024              cycles     insns   f1600  iter= 100
+ ML-KEM-1024  KeyGen     3748968    154738   69.11  mlkem_keygen_internal()
+ ML-KEM-1024  Encaps     4533213    171192   70.11  mlkem_encaps_internal()
+ ML-KEM-1024  Decaps     5932306    205649   70.11  mlkem_decaps_internal()
+perf_user_cycle=3379928303
+perf_user_instret=112333056
+
+===== xmlkem.rv64gcv_intr_vkec =====
+    cycles     insns
+    102234      1368  mlkem_poly_ntt() 2608
+    126113      1702  mlkem_poly_invntt_tomont() 1444
+       519        21  KeccakF1600_StatePermute()  6ea5537803894da3
+  ML-KEM-512              cycles     insns   f1600  iter= 100
+  ML-KEM-512  KeyGen     1056220     36429   27.02  mlkem_keygen_internal()
+  ML-KEM-512  Encaps     1396910     49160   26.02  mlkem_encaps_internal()
+  ML-KEM-512  Decaps     1989013     65862   26.02  mlkem_decaps_internal()
+  ML-KEM-768              cycles     insns   f1600  iter= 100
+  ML-KEM-768  KeyGen     1769293     64927   43.06  mlkem_keygen_internal()
+  ML-KEM-768  Encaps     2184311     78023   44.06  mlkem_encaps_internal()
+  ML-KEM-768  Decaps     2980777    101565   44.06  mlkem_decaps_internal()
+ ML-KEM-1024              cycles     insns   f1600  iter= 100
+ ML-KEM-1024  KeyGen     2669813     99181   69.11  mlkem_keygen_internal()
+ ML-KEM-1024  Encaps     3170388    115562   70.11  mlkem_encaps_internal()
+ ML-KEM-1024  Decaps     4180320    148386   70.11  mlkem_decaps_internal()
+perf_user_cycle=2398886155
+perf_user_instret=80554628
+
+===== xmldsa.rv64gcv_vkec =====
+    cycles     insns
+    162689      2399  mldsa_poly_ntt() 4748833
+    186611      2899  mldsa_poly_invntt_tomont() 2636588
+       526        22  KeccakF1600_StatePermute()  6ea5537803894da3
+   ML-DSA-44            cycles     insns   f1600  iter= 10
+   ML-DSA-44 KeyGen    3492528    214671  103.20  mldsa_keygen_internal()
+   ML-DSA-44 Sign     15694919    474026  157.60  mldsa_sign_internal()
+   ML-DSA-44 Verify    4435869    207432   99.00  mldsa_verify_internal()
+   ML-DSA-65            cycles     insns   f1600  iter= 10
+   ML-DSA-65 KeyGen    5457122    352735  188.00  mldsa_keygen_internal()
+   ML-DSA-65 Sign     31260147    917111  287.30  mldsa_sign_internal()
+   ML-DSA-65 Verify    6673034    337001  174.00  mldsa_verify_internal()
+   ML-DSA-87            cycles     insns   f1600  iter= 10
+   ML-DSA-87 KeyGen    8794615    605133  324.30  mldsa_keygen_internal()
+   ML-DSA-87 Sign     34152506   1136544  408.00  mldsa_sign_internal()
+   ML-DSA-87 Verify   10417589    585567  311.00  mldsa_verify_internal()
+perf_user_cycle=1713161491
+perf_user_instret=60607865
+
+===== xmldsa.rv64gcv_intr_vkec =====
+    cycles     insns
+     94192      2735  mldsa_poly_ntt() 4748833
+    112098      2985  mldsa_poly_invntt_tomont() 2636588
+       478        18  KeccakF1600_StatePermute()  6ea5537803894da3
+   ML-DSA-44            cycles     insns   f1600  iter= 10
+   ML-DSA-44 KeyGen    2812290    161788  103.20  mldsa_keygen_internal()
+   ML-DSA-44 Sign     11510882    432544  157.60  mldsa_sign_internal()
+   ML-DSA-44 Verify    3448348    157908   99.00  mldsa_verify_internal()
+   ML-DSA-65            cycles     insns   f1600  iter= 10
+   ML-DSA-65 KeyGen    4511923    254201  188.00  mldsa_keygen_internal()
+   ML-DSA-65 Sign     23218985    842106  287.30  mldsa_sign_internal()
+   ML-DSA-65 Verify    5296750    244598  174.00  mldsa_verify_internal()
+   ML-DSA-87            cycles     insns   f1600  iter= 10
+   ML-DSA-87 KeyGen    7411421    423608  324.30  mldsa_keygen_internal()
+   ML-DSA-87 Sign     25803552    970964  408.00  mldsa_sign_internal()
+   ML-DSA-87 Verify    8394913    400935  311.00  mldsa_verify_internal()
+perf_user_cycle=1257145641
+perf_user_instret=50399321
+

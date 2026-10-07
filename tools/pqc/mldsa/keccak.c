@@ -15,13 +15,20 @@ int64_t KeccakF1600_count = 0;
 //      rd  = vd    the vector register group holding the 1600-bit state
 //      rs1 = x18   not a register: 0b10010 is a fixed part of the opcode
 //      rs2 = imm5  round selector, x0 => 0 => Keccak-p[1600,24]
-//  The state is one fixed element group of EGW=2048 bits from vd, spanning
-//  NREG = ceil(2048/VLEN) registers regardless of vl and LMUL; vd = v0 is an
-//  aligned group start at every VLEN. vl only matters for the vle64/vse64
-//  that move the 25 live lanes: at LMUL=8 VLMAX is 8*VLEN/64, at least 25
-//  for VLEN >= 256 but only 16 at VLEN = 128, where the transfer is split.
-//  The pre-specification form of this wrapper (rs1 = x17, rs2 = x24 as a
-//  literal round count, vd = v8) is no longer decoded by karu64.
+//  The state is one 2048-bit element group (EGS = 32 SEW=64 elements) of
+//  the vd register group, and at VLEN >= 256 vkeccak.vi follows the ordinary
+//  element-group rules: it needs e64, an LMUL group of at least 2048 bits
+//  (LMUL=8 here; that is the only choice at VLEN=256), vd aligned to LMUL,
+//  and vl a multiple of 32. vd = v0 is a valid group start at every VLEN.
+//  So the 25 live lanes are loaded with vl=25, vl is set to 32 for the
+//  permutation of that one element group, and back to 25 for the store.
+//  Issuing the instruction at vl=25 is reserved and traps on a conforming
+//  implementation. At VLEN = 128 the specification's fixed 16-register group
+//  applies instead: vl is not consulted, and the transfer is split in two
+//  because VLMAX is only 16.
+//  This sequence also runs on the earlier fixed-group karu64 bitstreams,
+//  which ignored vl. The pre-specification form of this wrapper (rs1 = x17,
+//  rs2 = x24 as a literal round count, vd = v8) is no longer decoded.
 static inline unsigned long rv_vlenb(void)
 {
     unsigned long r;
@@ -38,13 +45,17 @@ void KeccakF1600_StatePermute(uint64_t state[25])
         __asm volatile(
             "vsetivli x0, 25, e64, m8, tu, mu\n"
             "vle64.v v0, 0(%[s])\n"
+            // one element group: e64, m8, vl = 32
+            "li t0, 32\n"
+            "vsetvli x0, t0, e64, m8, tu, mu\n"
             // vkeccak.vi v0, 0
             // .insn r opc, func3, func7, rd, rs1, rs2
             ".insn r 0x77, 0x2, 0x53, x0, x18, x0\n"
+            "vsetivli x0, 25, e64, m8, tu, mu\n"
             "vse64.v v0, 0(%[s])\n"
             :
             : [s] "r"(state)
-            : "memory", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
+            : "memory", "t0", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
               "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15");
     } else {                                    //  VLEN == 128
         uint64_t *hi = state + 16;

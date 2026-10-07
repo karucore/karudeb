@@ -1,0 +1,22 @@
+[shake_bench: resident-state vkeccak.vi, VLEN=256 bits, N=256, REPS=7]
+vkeccak.vi 24-round, VRF resident                   93.98 cycles/block  (best of 7 x 256 blocks)
+wrapper: vset25+vle64+vset32+vkeccak+vset25+vse64   417.56 cycles/block  (best of 7 x 256 blocks)
+vl switch pair (32 <-> rate), loop only             17.00 cycles/block  (best of 7 x 256 blocks)
+absorb 168 B (SHAKE128)                            315.08 cycles/block  (best of 7 x 256 blocks)
+absorb 136 B (SHAKE256)                            276.12 cycles/block  (best of 7 x 256 blocks)
+squeeze 168 B (SHAKE128)                           292.88 cycles/block  (best of 7 x 256 blocks)
+squeeze 136 B (SHAKE256)                           263.61 cycles/block  (best of 7 x 256 blocks)
+perf_user_cycle=21841988
+perf_user_instret=1675632
+
+== firmware-matching N=16, REPS=21 ==
+[shake_bench: resident-state vkeccak.vi, VLEN=256 bits, N=16, REPS=21]
+vkeccak.vi 24-round, VRF resident                   93.62 cycles/block  (best of 21 x 16 blocks)
+wrapper: vset25+vle64+vset32+vkeccak+vset25+vse64   415.56 cycles/block  (best of 21 x 16 blocks)
+vl switch pair (32 <-> rate), loop only             17.00 cycles/block  (best of 21 x 16 blocks)
+absorb 168 B (SHAKE128)                            250.50 cycles/block  (best of 21 x 16 blocks)
+absorb 136 B (SHAKE256)                            226.50 cycles/block  (best of 21 x 16 blocks)
+squeeze 168 B (SHAKE128)                           291.81 cycles/block  (best of 21 x 16 blocks)
+squeeze 136 B (SHAKE256)                           261.38 cycles/block  (best of 21 x 16 blocks)
+perf_user_cycle=13802939
+perf_user_instret=1161379

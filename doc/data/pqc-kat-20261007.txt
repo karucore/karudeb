@@ -1,0 +1,24 @@
+===== xmlkem.rv64gcv_vkec vs ml-kem-kat.txt =====
+ML-KEM-512  PASS= 60  FAIL= 0
+ML-KEM-768  PASS= 60  FAIL= 0
+ML-KEM-1024  PASS= 60  FAIL= 0
+keygen= 75  encaps= 75  decaps= 30
+rc=0 elapsed=19s
+===== xmlkem.rv64gcv_intr_vkec vs ml-kem-kat.txt =====
+ML-KEM-512  PASS= 60  FAIL= 0
+ML-KEM-768  PASS= 60  FAIL= 0
+ML-KEM-1024  PASS= 60  FAIL= 0
+keygen= 75  encaps= 75  decaps= 30
+rc=0 elapsed=12s
+===== xmldsa.rv64gcv_vkec vs ml-dsa-kat.txt =====
+ML-DSA-44  PASS= 60  FAIL= 0
+ML-DSA-65  PASS= 60  FAIL= 0
+ML-DSA-87  PASS= 60  FAIL= 0
+keygen= 75  siggen= 60  sigver= 45
+rc=0 elapsed=59s
+===== xmldsa.rv64gcv_intr_vkec vs ml-dsa-kat.txt =====
+ML-DSA-44  PASS= 60  FAIL= 0
+ML-DSA-65  PASS= 60  FAIL= 0
+ML-DSA-87  PASS= 60  FAIL= 0
+keygen= 75  siggen= 60  sigver= 45
+rc=0 elapsed=41s
