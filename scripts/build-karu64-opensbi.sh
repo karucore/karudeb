@@ -11,7 +11,7 @@ SRC_DIR="${SRC_DIR:-$PROJECT_ROOT/build/karu64/src}"
 OPENSBI_OUT_DIR="${OPENSBI_OUT_DIR:-${OUT_DIR:-$BUILD_DIR}}"
 JOBS="${JOBS:-$(nproc)}"
 
-OPENSBI_REF="${OPENSBI_REF:-v1.8.1}"
+OPENSBI_REF="${OPENSBI_REF:-v1.9}"
 OPENSBI_BUILD="${OPENSBI_BUILD:-$BUILD_DIR/build}"
 OPENSBI_LLVM="${OPENSBI_LLVM:-1}"
 OPENSBI_CROSS_COMPILE="${OPENSBI_CROSS_COMPILE:-riscv64-unknown-elf-}"
@@ -44,10 +44,64 @@ check_tools() {
 	fi
 }
 
+# An existing checkout is reused, so a changed OPENSBI_REF would otherwise
+# keep building the old release. Git itself identifies the checkout: a
+# worktree or a submodule has a .git file, not a directory, and a source
+# directory inside some other repository is not a checkout of its own.
+#
+# - The managed clone under SRC_DIR is switched to the requested tag, and the
+#   object directory is discarded so that nothing from the previous release
+#   is linked.
+# - A source tree given through OPENSBI_SRC is never modified; a mismatch
+#   there is an error.
+# - A source without Git metadata (a release tarball, an export) cannot be
+#   checked. It is refused unless OPENSBI_ALLOW_UNVERSIONED=1 says to build
+#   it as it is.
+
+# Print the exact tag, or else the short commit, of the checkout rooted at
+# OPENSBI_SRC. Fail if OPENSBI_SRC is not the top of a Git work tree.
+opensbi_src_ref() {
+	local top
+	top="$(git -C "$OPENSBI_SRC" rev-parse --show-toplevel 2>/dev/null)" || return 1
+	[[ "$(cd "$top" && pwd -P)" == "$(cd "$OPENSBI_SRC" && pwd -P)" ]] || return 1
+	git -C "$OPENSBI_SRC" describe --tags --exact-match 2>/dev/null ||
+		git -C "$OPENSBI_SRC" rev-parse --short HEAD
+}
+
+# True if OPENSBI_SRC is the clone this script manages under SRC_DIR. Both
+# paths are resolved first: SRC_DIR may be relative while OPENSBI_SRC has
+# already been made absolute, and either may pass through a symlink.
+opensbi_src_is_managed() {
+	local managed
+	managed="$(cd "$SRC_DIR/opensbi" 2>/dev/null && pwd -P)" || return 1
+	[[ "$(cd "$OPENSBI_SRC" && pwd -P)" == "$managed" ]]
+}
+
+sync_opensbi_ref() {
+	local have
+	if ! have="$(opensbi_src_ref)"; then
+		[[ "${OPENSBI_ALLOW_UNVERSIONED:-0}" == 1 ]] ||
+			die "OpenSBI source $OPENSBI_SRC has no Git metadata, so it cannot be checked against $OPENSBI_REF; set OPENSBI_ALLOW_UNVERSIONED=1 to build it as it is"
+		info "OpenSBI source $OPENSBI_SRC is unversioned; building it as it is (OPENSBI_ALLOW_UNVERSIONED=1)"
+		return 0
+	fi
+	[[ "$have" == "$OPENSBI_REF" ]] && return 0
+	if ! opensbi_src_is_managed; then
+		die "OpenSBI source $OPENSBI_SRC is at $have, not $OPENSBI_REF; check out $OPENSBI_REF or set OPENSBI_REF"
+	fi
+	[[ -z "$(git -C "$OPENSBI_SRC" status --porcelain)" ]] ||
+		die "OpenSBI source $OPENSBI_SRC is at $have with local changes; cannot switch to $OPENSBI_REF"
+	info "Switching OpenSBI source from $have to $OPENSBI_REF"
+	git -C "$OPENSBI_SRC" fetch --depth 1 origin tag "$OPENSBI_REF"
+	git -C "$OPENSBI_SRC" checkout -q "$OPENSBI_REF"
+	rm -rf "${OPENSBI_BUILD:?}"
+}
+
 fetch_opensbi_src() {
 	select_opensbi_src
 	if [[ -d "$OPENSBI_SRC" ]]; then
-		info "OpenSBI source: $OPENSBI_SRC"
+		sync_opensbi_ref
+		info "OpenSBI source: $OPENSBI_SRC ($(opensbi_src_ref || echo unversioned))"
 		return
 	fi
 	mkdir -p "$SRC_DIR"

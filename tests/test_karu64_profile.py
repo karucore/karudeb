@@ -212,6 +212,22 @@ class ProfileTests(unittest.TestCase):
         for prop in ("riscv,pmpregions", "riscv,pmpgranularity"):
             self.assertNotIn((CPU, prop), self.profile)
 
+    def test_zkr_variant_adds_only_zkr(self):
+        output = self.work / "zkr-variant"
+        run(["bash", ROOT / "scripts/build-karu64-dtb.sh"], env=clean_env(
+            DTB_VARIANT="rva23s64-zkr", OUT_DIR=output,
+        ))
+        zkr = dt_tree(output / "karu64-rva23s64-zkr-ddr.dtb")
+        # The source check for a karu64 image built with KARU_ZKR: this is the
+        # hash to compare with the control DTB line of that image's manifest.
+        print(f"zkr profile DTB sha256={digest(output / 'karu64-rva23s64-zkr-ddr.dtb')}")
+        self.assertEqual(validate_isa(zkr), validate_isa(self.profile) | {"zkr"})
+        isa_props = {(CPU, "riscv,isa"), (CPU, "riscv,isa-extensions")}
+        self.assertEqual({k: v for k, v in zkr.items() if k not in isa_props},
+                         {k: v for k, v in self.profile.items() if k not in isa_props})
+        # The tree without zkr stays the one that every image can use.
+        self.assertNotIn("zkr", validate_isa(self.profile))
+
     def test_short_profile_dtb_alias(self):
         output = self.work / "short-alias"
         run(["bash", ROOT / "scripts/build-karu64-dtb.sh"], env=clean_env(
@@ -351,6 +367,30 @@ class KconfigTests(unittest.TestCase):
 
     def test_extra_fragment_is_only_the_kvm_delta(self):
         self.assertEqual(read_kconfig(EXTRA_FRAGMENT), {"CONFIG_VIRTUALIZATION": "y", "CONFIG_KVM": "y"})
+
+    def test_vector_aes_modes_are_built_in(self):
+        for profile, config in self.configs.items():
+            for symbol in (
+                "CONFIG_RISCV_EFFICIENT_VECTOR_UNALIGNED_ACCESS",
+                "CONFIG_TOOLCHAIN_HAS_VECTOR_CRYPTO", "CONFIG_CRYPTO_AES",
+                "CONFIG_CRYPTO_LIB_AES_ARCH", "CONFIG_CRYPTO_SELFTESTS",
+                "CONFIG_CRYPTO_LIB_AES_ECB", "CONFIG_CRYPTO_LIB_AES_CBC",
+                "CONFIG_CRYPTO_LIB_AES_CTR", "CONFIG_CRYPTO_LIB_AES_XTS",
+            ):
+                with self.subTest(profile=profile, symbol=symbol):
+                    self.assertEqual(config.get(symbol), "y")
+
+    def test_container_support_is_preserved(self):
+        for profile, config in self.configs.items():
+            for symbol in (
+                "CONFIG_CGROUPS", "CONFIG_MEMCG", "CONFIG_CGROUP_PIDS",
+                "CONFIG_USER_NS", "CONFIG_PID_NS", "CONFIG_NET_NS",
+                "CONFIG_SECCOMP_FILTER", "CONFIG_CGROUP_BPF", "CONFIG_VETH",
+                "CONFIG_BRIDGE", "CONFIG_NF_NAT", "CONFIG_NF_TABLES",
+                "CONFIG_OVERLAY_FS", "CONFIG_EXT4_FS", "CONFIG_XFS_FS",
+            ):
+                with self.subTest(profile=profile, symbol=symbol):
+                    self.assertEqual(config.get(symbol), "y")
 
 
 if __name__ == "__main__":

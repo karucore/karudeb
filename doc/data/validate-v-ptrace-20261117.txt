@@ -1,0 +1,73 @@
+TAP version 13
+1..19
+# Starting 19 tests from 17 test cases.
+#  RUN           global.ptrace_v_not_enabled ...
+#            OK  global.ptrace_v_not_enabled
+ok 1 global.ptrace_v_not_enabled
+#  RUN           global.ptrace_v_early_debug ...
+#            OK  global.ptrace_v_early_debug
+ok 2 global.ptrace_v_early_debug
+#  RUN           global.ptrace_v_syscall_clobbering ...
+#            OK  global.ptrace_v_syscall_clobbering
+ok 3 global.ptrace_v_syscall_clobbering
+#  RUN           v_csr_invalid.new_vlenb.ptrace_v_invalid_values ...
+#            OK  v_csr_invalid.new_vlenb.ptrace_v_invalid_values
+ok 4 v_csr_invalid.new_vlenb.ptrace_v_invalid_values
+#  RUN           v_csr_invalid.vcsr_invalid_reserved_bits.ptrace_v_invalid_values ...
+#            OK  v_csr_invalid.vcsr_invalid_reserved_bits.ptrace_v_invalid_values
+ok 5 v_csr_invalid.vcsr_invalid_reserved_bits.ptrace_v_invalid_values
+#  RUN           v_csr_invalid.vtype_invalid_reserved_bits.ptrace_v_invalid_values ...
+#            OK  v_csr_invalid.vtype_invalid_reserved_bits.ptrace_v_invalid_values
+ok 6 v_csr_invalid.vtype_invalid_reserved_bits.ptrace_v_invalid_values
+#  RUN           v_csr_invalid.invalid_vill_bit.ptrace_v_invalid_values ...
+#            OK  v_csr_invalid.invalid_vill_bit.ptrace_v_invalid_values
+ok 7 v_csr_invalid.invalid_vill_bit.ptrace_v_invalid_values
+#  RUN           v_csr_invalid.reserved_vsew.ptrace_v_invalid_values ...
+#            OK  v_csr_invalid.reserved_vsew.ptrace_v_invalid_values
+ok 8 v_csr_invalid.reserved_vsew.ptrace_v_invalid_values
+#  RUN           v_csr_invalid.reserved_vediv.ptrace_v_invalid_values ...
+#      SKIP      Test not supported for Vector
+#            OK  v_csr_invalid.reserved_vediv.ptrace_v_invalid_values
+ok 9 v_csr_invalid.reserved_vediv.ptrace_v_invalid_values # SKIP Test not supported for Vector
+#  RUN           v_csr_invalid.reserved_vlmul.ptrace_v_invalid_values ...
+#            OK  v_csr_invalid.reserved_vlmul.ptrace_v_invalid_values
+ok 10 v_csr_invalid.reserved_vlmul.ptrace_v_invalid_values
+#  RUN           v_csr_invalid.frac_lmul1.ptrace_v_invalid_values ...
+#            OK  v_csr_invalid.frac_lmul1.ptrace_v_invalid_values
+ok 11 v_csr_invalid.frac_lmul1.ptrace_v_invalid_values
+#  RUN           v_csr_invalid.int_lmul1.ptrace_v_invalid_values ...
+#      SKIP      This test does not support VLEN > 16
+
+#            OK  v_csr_invalid.int_lmul1.ptrace_v_invalid_values
+ok 12 v_csr_invalid.int_lmul1.ptrace_v_invalid_values # SKIP This test does not support VLEN > 16
+
+#  RUN           v_csr_invalid.int_lmul2.ptrace_v_invalid_values ...
+#      SKIP      Test not supported for Vector
+#            OK  v_csr_invalid.int_lmul2.ptrace_v_invalid_values
+ok 13 v_csr_invalid.int_lmul2.ptrace_v_invalid_values # SKIP Test not supported for Vector
+#  RUN           v_csr_invalid.vl1.ptrace_v_invalid_values ...
+#      SKIP      This test does not support VLEN > 128
+
+#            OK  v_csr_invalid.vl1.ptrace_v_invalid_values
+ok 14 v_csr_invalid.vl1.ptrace_v_invalid_values # SKIP This test does not support VLEN > 128
+
+#  RUN           v_csr_invalid.vl2.ptrace_v_invalid_values ...
+#      SKIP      Test not supported for Vector
+#            OK  v_csr_invalid.vl2.ptrace_v_invalid_values
+ok 15 v_csr_invalid.vl2.ptrace_v_invalid_values # SKIP Test not supported for Vector
+#  RUN           v_csr_valid.frac_lmul1.ptrace_v_valid_values ...
+#            OK  v_csr_valid.frac_lmul1.ptrace_v_valid_values
+ok 16 v_csr_valid.frac_lmul1.ptrace_v_valid_values
+#  RUN           v_csr_valid.int_lmul1.ptrace_v_valid_values ...
+#            OK  v_csr_valid.int_lmul1.ptrace_v_valid_values
+ok 17 v_csr_valid.int_lmul1.ptrace_v_valid_values
+#  RUN           v_csr_valid.int_lmul2.ptrace_v_valid_values ...
+#      SKIP      Test not supported for Vector
+#            OK  v_csr_valid.int_lmul2.ptrace_v_valid_values
+ok 18 v_csr_valid.int_lmul2.ptrace_v_valid_values # SKIP Test not supported for Vector
+#  RUN           v_csr_valid.int_lmul3.ptrace_v_valid_values ...
+#            OK  v_csr_valid.int_lmul3.ptrace_v_valid_values
+ok 19 v_csr_valid.int_lmul3.ptrace_v_valid_values
+# PASSED: 19 / 19 tests passed.
+# 6 skipped test(s) detected. Consider enabling relevant config options to improve coverage.
+# Totals: pass:13 fail:0 xfail:0 xpass:0 skip:6 error:0

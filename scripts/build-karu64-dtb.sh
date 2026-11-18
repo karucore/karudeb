@@ -14,6 +14,11 @@ case "$DTB_VARIANT" in
     DTB_VARIANT="rva23s64-ddr"
     DTS="${DTS:-$PROJECT_ROOT/configs/karu64-rva23s64-nfsroot-ddr.dts}"
     ;;
+  rva23s64-zkr|rva23s64-zkr-ddr)
+    # The same board with "zkr": only for karu64 images built with KARU_ZKR.
+    DTB_VARIANT="rva23s64-zkr-ddr"
+    DTS="${DTS:-$PROJECT_ROOT/configs/karu64-rva23s64-zkr-nfsroot-ddr.dts}"
+    ;;
   rv64imac|imac|rv64imac-ddr|imac-ddr)
     DTB_VARIANT="rv64imac-ddr"
     DTS="${DTS:-$PROJECT_ROOT/configs/karu64-rv64imac-ddr.dts}"
@@ -39,7 +44,7 @@ case "$DTB_VARIANT" in
     DTS="${DTS:-$PROJECT_ROOT/configs/karu64-nfsroot-sim.dts}"
     ;;
   *)
-    die "DTB_VARIANT must be 'rva23s64-ddr', 'rv64imac-ddr', 'zvk-ddr', 'rv64gc-ddr', 'ddr', or 'sim'"
+    die "DTB_VARIANT must be 'rva23s64-ddr', 'rva23s64-zkr-ddr', 'rv64imac-ddr', 'zvk-ddr', 'rv64gc-ddr', 'ddr', or 'sim'"
     ;;
 esac
 

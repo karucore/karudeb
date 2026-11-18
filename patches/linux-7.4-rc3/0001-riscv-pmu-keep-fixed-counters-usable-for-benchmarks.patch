@@ -1,0 +1,85 @@
+From: karudeb build
+Subject: [PATCH] riscv: pmu: keep fixed counters usable for benchmarks
+
+Port the generic karudeb PMU workaround to Linux 7.4-rc3's multiword
+counter bitmaps and variadic SBI calls. The existing ROM has no PMU event
+map, so retain the architectural cycle/instruction event mappings and do
+not stop the fixed counters during PMU initialization. Only bitmap word
+zero contains those fixed counters; leave later words unchanged.
+
+diff --git a/drivers/perf/riscv_pmu_sbi.c b/drivers/perf/riscv_pmu_sbi.c
+--- a/drivers/perf/riscv_pmu_sbi.c
++++ b/drivers/perf/riscv_pmu_sbi.c
+@@ -99,6 +99,20 @@ static unsigned int riscv_pmu_irq;
+ /* Cache the available counters in a bitmask */
+ static DECLARE_BITMAP(cmask, RISCV_MAX_COUNTERS);
+ 
++#define RISCV_PMU_FIXED_CTR_MASK	(BIT(CSR_CYCLE - CSR_CYCLE) | \
++					 BIT(CSR_INSTRET - CSR_CYCLE))
++
++static bool pmu_sbi_is_fixed_hw_event(u32 event_idx)
++{
++	const u32 cycles = (SBI_PMU_EVENT_TYPE_HW << 16) |
++			   SBI_PMU_HW_CPU_CYCLES;
++	const u32 instructions = (SBI_PMU_EVENT_TYPE_HW << 16) |
++				 SBI_PMU_HW_INSTRUCTIONS;
++
++	/* Keep architectural fixed counters available to Karu benchmarks. */
++	return event_idx == cycles || event_idx == instructions;
++}
++
+ static int pmu_event_find_cache(u64 config);
+ struct sbi_pmu_event_data {
+ 	union {
+@@ -379,6 +393,9 @@ static void pmu_sbi_check_event(struct sbi_pmu_event_data *edata)
+ 	struct sbiret ret = { .error = SBI_ERR_NOT_SUPPORTED };
+ 	int i;
+ 
++	if (pmu_sbi_is_fixed_hw_event(edata->event_idx))
++		return;
++
+ 	for (i = 0; i < BITS_TO_LONGS(RISCV_MAX_COUNTERS); i++) {
+ 		if (!cmask[i])
+ 			continue;
+@@ -442,7 +459,15 @@ int riscv_pmu_get_event_info(u32 type, u64 config, u64 *econfig)
+ 	case PERF_TYPE_HARDWARE:
+ 		if (config >= PERF_COUNT_HW_MAX)
+ 			return -EINVAL;
+-		ret = pmu_hw_event_map[config].event_idx;
++		if (config == PERF_COUNT_HW_CPU_CYCLES) {
++			ret = (SBI_PMU_EVENT_TYPE_HW << 16) |
++			      SBI_PMU_HW_CPU_CYCLES;
++		} else if (config == PERF_COUNT_HW_INSTRUCTIONS) {
++			ret = (SBI_PMU_EVENT_TYPE_HW << 16) |
++			      SBI_PMU_HW_INSTRUCTIONS;
++		} else {
++			ret = pmu_hw_event_map[config].event_idx;
++		}
+ 		break;
+ 	case PERF_TYPE_HW_CACHE:
+ 		ret = pmu_event_find_cache(config);
+@@ -929,17 +954,22 @@ static int pmu_sbi_get_ctrinfo(int nctr, unsigned long *mask)
+ 
+ static inline void pmu_sbi_stop_all(struct riscv_pmu *pmu)
+ {
++	unsigned long stop_mask;
+ 	int i;
+ 
+ 	/*
+ 	 * No need to check the error because we are disabling all the counters
+ 	 * which may include counters that are not enabled yet.
++	 * Keep cycle/instret running for direct userspace benchmark reads.
+ 	 */
+ 	for (i = 0; i < BITS_TO_LONGS(RISCV_MAX_COUNTERS); i++) {
+-		if (!pmu->cmask[i])
++		stop_mask = pmu->cmask[i];
++		if (i == 0)
++			stop_mask &= ~RISCV_PMU_FIXED_CTR_MASK;
++		if (!stop_mask)
+ 			continue;
+ 		sbi_ecall(SBI_EXT_PMU, SBI_EXT_PMU_COUNTER_STOP,
+-			  i * BITS_PER_LONG, pmu->cmask[i],
++			  i * BITS_PER_LONG, stop_mask,
+ 			  SBI_PMU_STOP_FLAG_RESET);
+ 	}
+ }

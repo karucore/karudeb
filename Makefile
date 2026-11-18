@@ -6,16 +6,18 @@ help:
 	@printf '%s\n' 'Targets:'
 	@printf '  %-12s %s\n' clean 'remove local caches and QEMU logs'
 	@printf '  %-12s %s\n' distclean 'remove build/ as well'
-	@printf '  %-12s %s\n' kernel-qemu 'fetch/build Linux 7.2.6 QEMU kernel'
+	@printf '  %-12s %s\n' kernel-qemu 'fetch/build Linux 7.4-rc3 QEMU kernel'
 	@printf '  %-12s %s\n' zvknhk-openssl 'build static Zvknhk OpenSSL + pqcbench from ../riscv-pqc'
 	@printf '  %-12s %s\n' zvknhk-check 'check those binaries under the riscv-pqc user-mode QEMU'
 	@printf '  %-12s %s\n' zvknhk-clean 'remove build/zvknhk'
 	@printf '  %-12s %s\n' karu-opensbi 'build generic karu64 OpenSBI fw_jump'
+	@printf '  %-12s %s\n' karu-opensbi-check 'test the OpenSBI source/version check (offline)'
 	@printf '  %-12s %s\n' karu64-rv64imac-dtb 'build reduced RV64IMAC ROM control DTB'
 	@printf '  %-12s %s\n' karu64-rv64gc-linux 'build scalar RV64GC NFS-root kernel'
 	@printf '  %-12s %s\n' karu64-zvk-linux 'build RVA23/Zvk NFS-root kernel'
 	@printf '  %-12s %s\n' karu64-rva23s64-linux 'build H-enabled profile NFS-root/KVM kernel'
 	@printf '  %-12s %s\n' karu64-rva23s64-tftp 'stage matching profile kernel and DTB'
+	@printf '  %-12s %s\n' karu64-rva23s64-zkr-tftp 'the same with zkr in the DTB (images built with KARU_ZKR)'
 	@printf '  %-12s %s\n' karu64-rv64gc-tftp 'stage scalar RV64GC NFS netboot files'
 	@printf '  %-12s %s\n' karu64-zvk-tftp 'stage RVA23/Zvk NFS netboot files'
 	@printf '  %-12s %s\n' karu-rv64imac-check 'check tools for karu64 RV64IMAC soft-float image'
@@ -52,6 +54,12 @@ zvknhk-clean:
 
 karu-opensbi:
 	./scripts/build-karu64-opensbi.sh build
+
+# Offline: fixture repositories only, no network and no cross compiler. It
+# does not touch build/karu64.
+.PHONY: karu-opensbi-check
+karu-opensbi-check:
+	python3 tests/test_opensbi_source.py
 
 karu64-rv64imac-dtb:
 	DTB_VARIANT=rv64imac-ddr ./scripts/build-karu64-dtb.sh
@@ -95,6 +103,15 @@ karu64-rva23s64-dtb:
 
 karu64-rva23s64-tftp: karu64-rva23s64-linux karu64-rva23s64-dtb
 	DTB_VARIANT=rva23s64-ddr ./scripts/stage-karu64-tftp.sh
+
+# The same profile board with "zkr" in its device tree, for karu64 images
+# built with KARU_ZKR. The kernel is the profile kernel; only the DTB differs.
+.PHONY: karu64-rva23s64-zkr-dtb karu64-rva23s64-zkr-tftp
+karu64-rva23s64-zkr-dtb:
+	DTB_VARIANT=rva23s64-zkr-ddr ./scripts/build-karu64-dtb.sh
+
+karu64-rva23s64-zkr-tftp: karu64-rva23s64-linux karu64-rva23s64-zkr-dtb
+	DTB_VARIANT=rva23s64-zkr-ddr ./scripts/stage-karu64-tftp.sh
 
 karu64-rva23s64-check:
 	python3 tests/test_karu64_profile.py

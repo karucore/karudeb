@@ -1,0 +1,583 @@
+Linux karudeb 7.4.0-rc3-zvk-dirty #3 SMP PREEMPT Tue Nov 17 10:56:04 EET 2026 riscv64 GNU/Linux
+
+== Kernel command line ==
+console=ttyS0,115200 earlycon root=/dev/nfs rw ip=192.168.42.10:192.168.42.1:192.168.42.1:255.255.255.0:karudeb:eth0:off nfsroot=192.168.42.1:/srv/nfs/karudeb,vers=3,tcp,nolock
+
+== Root filesystem ==
+192.168.42.1:/srv/nfs/karudeb / nfs rw,relatime,vers=3,rsize=4096,wsize=4096,namlen=255,hard,nolock,fatal_neterrors=none,proto=tcp,timeo=600,retrans=2,sec=sys,mountaddr=192.168.42.1,mountvers=3,mountproto=tcp,local_lock=all,addr=192.168.42.1 0 0
+
+== Registered crypto ==
+name         : camellia
+driver       : camellia-generic
+module       : kernel
+priority     : 100
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : cipher
+blocksize    : 16
+min keysize  : 16
+max keysize  : 32
+
+name         : xts(aes)
+driver       : xts-aes-lib
+module       : kernel
+priority     : 500
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : skcipher
+async        : no
+blocksize    : 16
+min keysize  : 32
+max keysize  : 64
+ivsize       : 16
+chunksize    : 16
+walksize     : 16
+statesize    : 0
+
+name         : ctr(aes)
+driver       : ctr-aes-lib
+module       : kernel
+priority     : 500
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : skcipher
+async        : no
+blocksize    : 1
+min keysize  : 16
+max keysize  : 32
+ivsize       : 16
+chunksize    : 16
+walksize     : 16
+statesize    : 0
+
+name         : cts(cbc(aes))
+driver       : cts-cbc-aes-lib
+module       : kernel
+priority     : 500
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : skcipher
+async        : no
+blocksize    : 16
+min keysize  : 16
+max keysize  : 32
+ivsize       : 16
+chunksize    : 16
+walksize     : 16
+statesize    : 0
+
+name         : cbc(aes)
+driver       : cbc-aes-lib
+module       : kernel
+priority     : 500
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : skcipher
+async        : no
+blocksize    : 16
+min keysize  : 16
+max keysize  : 32
+ivsize       : 16
+chunksize    : 16
+walksize     : 16
+statesize    : 0
+
+name         : ecb(aes)
+driver       : ecb-aes-lib
+module       : kernel
+priority     : 500
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : skcipher
+async        : no
+blocksize    : 16
+min keysize  : 16
+max keysize  : 32
+ivsize       : 0
+chunksize    : 16
+walksize     : 16
+statesize    : 0
+
+name         : cmac(aes)
+driver       : cmac-aes-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 16
+digestsize   : 16
+
+name         : aes
+driver       : aes-lib
+module       : kernel
+priority     : 100
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : cipher
+blocksize    : 16
+min keysize  : 16
+max keysize  : 32
+
+name         : hmac(sha512)
+driver       : hmac-sha512-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 128
+digestsize   : 64
+
+name         : hmac(sha384)
+driver       : hmac-sha384-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 128
+digestsize   : 48
+
+name         : sha512
+driver       : sha512-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 128
+digestsize   : 64
+
+name         : sha384
+driver       : sha384-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 128
+digestsize   : 48
+
+name         : hmac(sha256)
+driver       : hmac-sha256-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 64
+digestsize   : 32
+
+name         : hmac(sha224)
+driver       : hmac-sha224-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 64
+digestsize   : 28
+
+name         : sha256
+driver       : sha256-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 64
+digestsize   : 32
+
+name         : sha224
+driver       : sha224-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 64
+digestsize   : 28
+
+name         : hmac(sha1)
+driver       : hmac-sha1-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 64
+digestsize   : 20
+
+name         : sha1
+driver       : sha1-lib
+module       : kernel
+priority     : 300
+refcnt       : 1
+selftest     : passed
+internal     : no
+type         : shash
+blocksize    : 64
+digestsize   : 20
+
+
+== Kernel log ==
+[    0.000000] Booting Linux on hartid 0
+[    0.000000] Linux version 7.4.0-rc3-zvk-dirty (mjos-ai@blk) (clang version 24.0.0git (https://github.com/llvm/llvm-project.git 109f29a7c0a3910a768fa7dd490ac8f51708b858), LLD 24.0.0 (https://github.com/llvm/llvm-project.git 109f29a7c0a3910a768fa7dd490ac8f51708b858)) #3 SMP PREEMPT Tue Nov 17 10:56:04 EET 2026
+[    0.000000] Machine model: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root
+[    0.000000] SBI specification v3.0 detected
+[    0.000000] SBI implementation ID=0x1 Version=0x10008
+[    0.000000] SBI TIME extension detected
+[    0.000000] SBI IPI extension detected
+[    0.000000] SBI RFENCE extension detected
+[    0.000000] SBI DBCN extension detected
+[    0.000000] SBI FWFT extension detected
+[    0.000000] earlycon: ns16550a0 MMIO:0x0000000010000000 (options '')
+[    0.000000] printk: legacy bootconsole [ns16550a0] enabled
+[    0.000000] OF: reserved mem: 0x0000000080040000..0x000000008005ffff (128 KiB) nomap non-reusable mmode_resv0@80040000
+[    0.000000] OF: reserved mem: 0x0000000080000000..0x000000008003ffff (256 KiB) nomap non-reusable mmode_resv1@80000000
+[    0.000000] SBI HSM extension detected
+[    0.000000] riscv: base ISA extensions abcdfhimv
+[    0.000000] riscv: ELF capabilities abcdfimv
+[    0.000000] Ticket spinlock: enabled
+[    0.000000] Zone ranges:
+[    0.000000]   DMA32    [mem 0x0000000080000000-0x00000000ffffffff]
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000080000000-0x000000008005ffff]
+[    0.000000]   node   0: [mem 0x0000000080060000-0x00000000ffffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000080000000-0x00000000ffffffff]
+[    0.000000] percpu: Embedded 20 pages/cpu s49368 r0 d32552 u81920
+[    0.000000] pcpu-alloc: s49368 r0 d32552 u81920 alloc=20*4096
+[    0.000000] pcpu-alloc: [0] 0 
+[    0.000000] Kernel command line: console=ttyS0,115200 earlycon root=/dev/nfs rw ip=192.168.42.10:192.168.42.1:192.168.42.1:255.255.255.0:karudeb:eth0:off nfsroot=192.168.42.1:/srv/nfs/karudeb,vers=3,tcp,nolock
+[    0.000000] printk: log buffer data + meta data: 131072 + 458752 = 589824 bytes
+[    0.000000] Dentry cache hash table entries: 262144 (order: 9, 2097152 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 2MB
+[    0.000000] software IO TLB: area num 1.
+[    0.000000] software IO TLB: mapped [mem 0x00000000fdae2000-0x00000000fdce2000] (2MB)
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 524288
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] rcu: Hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU event tracing is enabled.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=256 to nr_cpu_ids=1.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 10 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+[    0.000000] RCU Tasks: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] riscv-intc: 64 local interrupts mapped
+[    0.000000] riscv: providing IPIs using SBI IPI extension
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
+[    0.000000] clocksource: riscv_clocksource: mask: 0xffffffffffffffff max_cycles: 0x1d854df40, max_idle_ns: 3526361616960 ns
+[    0.000055] sched_clock: 64 bits at 1000kHz, resolution 1000ns, wraps every 2199023255500ns
+[    0.008570] riscv-timer: Timer interrupt in S-mode is available via sstc extension
+[    0.023574] Console: colour dummy device 80x25
+[    0.029346] Calibrating delay loop (skipped), value calculated using timer frequency.. 2.00 BogoMIPS (lpj=10000)
+[    0.040478] pid_max: default: 32768 minimum: 301
+[    0.067138] Mount-cache hash table entries: 4096 (order: 3, 32768 bytes, linear)
+[    0.076055] Mountpoint-cache hash table entries: 4096 (order: 3, 32768 bytes, linear)
+[    0.107068] VFS: Finished mounting rootfs on nullfs
+[    0.229133] ASID allocator using 16 bits (65536 entries)
+[    0.242819] rcu: Hierarchical SRCU implementation.
+[    0.247702] rcu: 	Max phase no-delay instances is 1000.
+[    0.284639] smp: Bringing up secondary CPUs ...
+[    0.288769] smp: Brought up 1 node, 1 CPU
+[    0.302199] Memory: 2046072K/2097152K available (7023K kernel code, 773K rwdata, 1339K rodata, 435K init, 350K bss, 48344K reserved, 0K cma-reserved)
+[    0.335328] devtmpfs: initialized
+[    0.433943] posixtimers hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.443060] futex hash table entries: 256 (16384 bytes on 1 NUMA nodes, total 16 KiB, linear).
+[    0.523081] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.558459] DMA: preallocated 256 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.714785] pps_core: LinuxPPS API ver. 1 registered
+[    0.719360] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+[    0.730014] PTP clock support registered
+[    0.795479] clocksource: Switched to clocksource riscv_clocksource
+[    1.400094] NET: Registered PF_INET protocol family
+[    1.423153] IP idents hash table entries: 32768 (order: 6, 262144 bytes, linear)
+[    1.712748] tcp_listen_portaddr_hash hash table entries: 1024 (order: 2, 16384 bytes, linear)
+[    1.723462] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    1.732916] TCP established hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    1.757470] TCP bind hash table entries: 16384 (order: 7, 524288 bytes, linear)
+[    1.798968] TCP: Hash tables configured (established 16384 bind 16384)
+[    1.811571] UDP hash table entries: 1024 (order: 4, 65536 bytes, linear)
+[    1.831589] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    1.867271] RPC: Registered named UNIX socket transport module.
+[    1.872898] RPC: Registered udp transport module.
+[    1.877733] RPC: Registered tcp transport module.
+[    1.882017] RPC: Registered tcp-with-tls transport module.
+[    1.887709] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    1.916370] cpu0: scalar unaligned word access speed is 4.59x byte access speed (fast)
+[    1.930477] NET: Registered PF_INET6 protocol family
+[    2.003926] Segment Routing with IPv6
+[    2.011961] In-situ OAM (IOAM) with IPv6
+[    2.022953] kvm [1]: hypervisor extension available
+[    2.039090] kvm [1]: highest G-stage page table mode is Sv39x4
+[    2.044686] kvm [1]: VMID 14 bits available
+[    2.090851] workingset: timestamp_bits=46 (anon: 41) max_order=19 bucket_order=0 (anon: 0)
+[    2.129059] Key type nfs_keyring registered
+[    2.166868] SGI XFS with security attributes, scrub, repair, no debug enabled
+[    2.255830] riscv-plic: plic@c000000: mapped 32 interrupts with 1 handlers for 2 contexts.
+[    2.297076] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    2.411886] printk: console [ttyS0] disabled
+[    2.438508] 10000000.ns16550: ttyS0 MMIO:0x0000000010000000 (irq = 12, base_baud = 625000) is a 16550A
+[    2.450409] printk: console [ttyS0] enabled
+[    2.459160] printk: legacy bootconsole [ns16550a0] disabled
+[    2.547307] tun: Universal TUN/TAP device driver, 1.6
+[    2.616483] liteeth 11001000.ethernet eth0: irq 13 slots: tx 2 rx 2 size 2048
+[    2.637401] riscv-pmu-sbi: SBI PMU extension is available
+[    2.640223] riscv-pmu-sbi: 16 firmware and 31 hardware counters
+[    2.752508] IPVS: Registered protocols (TCP, UDP)
+[    2.753295] IPVS: Connection hash table configured (size=4096, memory=32Kbytes)
+[    2.774849] IPVS: ipvs loaded.
+[    2.775701] IPVS: [rr] scheduler registered.
+[    2.804050] sit: IPv6, IPv4 and MPLS over IPv4 tunneling driver
+[    2.850140] NET: Registered PF_PACKET protocol family
+[    2.852991] br_netfilter is slated for removal in 2027.
+[    5.976645] IP-Config: Complete:
+[    5.976896]      device=eth0, hwaddr=02:00:00:00:00:10, ipaddr=192.168.42.10, mask=255.255.255.0, gw=192.168.42.1
+[    5.977705]      host=karudeb, domain=, nis-domain=(none)
+[    5.978089]      bootserver=192.168.42.1, rootserver=192.168.42.1, rootpath=
+[    5.984696] clk: Disabling unused clocks
+[    7.083737] VFS: Mounted root (nfs filesystem) on device 0:17.
+[    7.102636] devtmpfs: mounted
+[    7.111039] VFS: Pivoted into new rootfs
+[    7.139457] Freeing unused kernel image (initmem) memory: 432K
+[    7.139862] Kernel memory protection not selected by kernel config.
+[    7.140561] Run /sbin/init as init process
+[    7.140855]   with arguments:
+[    7.141082]     /sbin/init
+[    7.141352]   with environment:
+[    7.141582]     HOME=/
+[    7.141842]     TERM=linux
+[  100.067499] random: crng init done
+[ 1929.063346] edge_probe0[957]: unhandled signal 4 code 0x1 at 0x00000000000105ae in edge_probe0[5ae,10000+6d000]
+[ 1929.064684] CPU: 0 UID: 0 PID: 957 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1929.085957] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1929.086326] epc : 00000000000105ae ra : 0000000000010b12 sp : 0000003fd6fc6d20
+[ 1929.086823]  gp : 0000000000083058 tp : 000000000ca04780 t0 : 0000000000000020
+[ 1929.087312]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003fd6fc6d80
+[ 1929.087794]  s1 : 0000000000000002 a0 : 0000000000000013 a1 : ffffffffffffffff
+[ 1929.088275]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000040
+[ 1929.088747]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003fd6fc7e93
+[ 1929.089222]  s2 : 0000003fd6fc70c8 s3 : 0000000000000002 s4 : 0000003fd6fc70e0
+[ 1929.089708]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1929.090181]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1929.090653]  s11: 0000002acf8a49a0 t3 : 0000000000000003 t4 : 0000003fd6fc7e93
+[ 1929.091143]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1929.091633] status: 8000000200004220 badaddr: 00000000a6092077 cause: 0000000000000002
+[ 1929.092908] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a609 
+[ 1930.846362] edge_probe0[964]: unhandled signal 4 code 0x1 at 0x0000000000010654 in edge_probe0[654,10000+6d000]
+[ 1930.847695] CPU: 0 UID: 0 PID: 964 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1930.848497] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1930.848857] epc : 0000000000010654 ra : 0000000000010b12 sp : 0000003fdfd4d6e0
+[ 1930.849354]  gp : 0000000000083058 tp : 00000000235f0780 t0 : 0000000000000020
+[ 1930.849844]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003fdfd4d740
+[ 1930.850325]  s1 : 0000000000000002 a0 : 000000000000001b a1 : 0000000000000020
+[ 1930.850780]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000020
+[ 1930.851252]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003fdfd4de93
+[ 1930.851728]  s2 : 0000003fdfd4da88 s3 : 0000000000000002 s4 : 0000003fdfd4daa0
+[ 1930.852213]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1930.852686]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1930.853159]  s11: 0000002acf8a49a0 t3 : 0000000000000004 t4 : 0000003fdfd4de93
+[ 1930.853653]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1930.854142] status: 8000000200006620 badaddr: 00000000a6092277 cause: 0000000000000002
+[ 1930.964664] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2277) a609 
+[ 1932.623109] edge_probe0[971]: unhandled signal 4 code 0x1 at 0x00000000000105ae in edge_probe0[5ae,10000+6d000]
+[ 1932.624457] CPU: 0 UID: 0 PID: 971 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1932.645637] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1932.646011] epc : 00000000000105ae ra : 0000000000010b12 sp : 0000003fde93d1e0
+[ 1932.646511]  gp : 0000000000083058 tp : 000000000aa78780 t0 : 0000000000000020
+[ 1932.647004]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003fde93d240
+[ 1932.647490]  s1 : 0000000000000002 a0 : 000000000000001b a1 : 0000000000000010
+[ 1932.647951]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000010
+[ 1932.648428]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003fde93de93
+[ 1932.648908]  s2 : 0000003fde93d588 s3 : 0000000000000002 s4 : 0000003fde93d5a0
+[ 1932.649397]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1932.649874]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1932.650351]  s11: 0000002acf8a49a0 t3 : 0000000000000005 t4 : 0000003fde93de93
+[ 1932.650847]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1932.651342] status: 8000000200004220 badaddr: 00000000a6092077 cause: 0000000000000002
+[ 1932.652637] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a609 
+[ 1934.414887] edge_probe0[978]: unhandled signal 4 code 0x1 at 0x00000000000105ae in edge_probe0[5ae,10000+6d000]
+[ 1934.416928] CPU: 0 UID: 0 PID: 978 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1934.417732] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1934.418093] epc : 00000000000105ae ra : 0000000000010b12 sp : 0000003ff77552b0
+[ 1934.418591]  gp : 0000000000083058 tp : 000000000d7a1780 t0 : 0000000000000020
+[ 1934.419081]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003ff7755310
+[ 1934.419565]  s1 : 0000000000000002 a0 : 000000000000001b a1 : 0000000000000020
+[ 1934.420023]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000020
+[ 1934.420497]  a5 : 0000000000000010 a6 : 0000000000000010 a7 : 0000003ff7755e93
+[ 1934.420979]  s2 : 0000003ff7755658 s3 : 0000000000000002 s4 : 0000003ff7755670
+[ 1934.421464]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1934.421939]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1934.422410]  s11: 0000002acf8a49a0 t3 : 0000000000000006 t4 : 0000003ff7755e93
+[ 1934.422901]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1934.423391] status: 8000000200006620 badaddr: 00000000a6092077 cause: 0000000000000002
+[ 1934.424652] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a609 
+[ 1939.679239] edge_probe0[999]: unhandled signal 4 code 0x1 at 0x00000000000108ec in edge_probe0[8ec,10000+6d000]
+[ 1939.680578] CPU: 0 UID: 0 PID: 999 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1939.681380] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1939.681740] epc : 00000000000108ec ra : 0000000000010b12 sp : 0000003fe7c2e8a0
+[ 1939.682236]  gp : 0000000000083058 tp : 0000000034692780 t0 : 0000000000000020
+[ 1939.682725]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003fe7c2e900
+[ 1939.683207]  s1 : 0000000000000002 a0 : 000000000000001b a1 : 0000000000000020
+[ 1939.683660]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000020
+[ 1939.684131]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003fe7c2fe93
+[ 1939.684606]  s2 : 0000003fe7c2ec48 s3 : 0000000000000002 s4 : 0000003fe7c2ec60
+[ 1939.759630]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1939.760113]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1939.760587]  s11: 0000002acf8a49a0 t3 : 0000000000000009 t4 : 0000003fe7c2fe93
+[ 1939.761078]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1939.761568] status: 8000000200004220 badaddr: 00000000a6292077 cause: 0000000000000002
+[ 1939.762832] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a629 
+[ 1941.457741] edge_probe0[1006]: unhandled signal 4 code 0x1 at 0x00000000000105ae in edge_probe0[5ae,10000+6d000]
+[ 1941.459081] CPU: 0 UID: 0 PID: 1006 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1941.459886] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1941.460248] epc : 00000000000105ae ra : 0000000000010b12 sp : 0000003fda010be0
+[ 1941.460746]  gp : 0000000000083058 tp : 0000000025224780 t0 : 0000000000000020
+[ 1941.461240]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003fda010c40
+[ 1941.461725]  s1 : 0000000000000002 a0 : 0000000000000004 a1 : 0000000000000020
+[ 1941.462177]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000000
+[ 1941.462647]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003fda011e93
+[ 1941.463126]  s2 : 0000003fda010f88 s3 : 0000000000000002 s4 : 0000003fda010fa0
+[ 1941.463612]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1941.464087]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1941.464558]  s11: 0000002acf8a49a0 t3 : 000000000000000a t4 : 0000003fda011e92
+[ 1941.560101]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1941.560600] status: 8000000200004220 badaddr: 00000000a6092077 cause: 0000000000000002
+[ 1941.561869] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a609 
+[ 1943.238923] edge_probe0[1013]: unhandled signal 4 code 0x1 at 0x0000000000010992 in edge_probe0[992,10000+6d000]
+[ 1943.240264] CPU: 0 UID: 0 PID: 1013 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1943.241068] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1943.241431] epc : 0000000000010992 ra : 0000000000010b12 sp : 0000003fcbb4d330
+[ 1943.241927]  gp : 0000000000083058 tp : 000000003df7a780 t0 : 0000000000000020
+[ 1943.242418]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003fcbb4d390
+[ 1943.242903]  s1 : 0000000000000002 a0 : 000000000000001b a1 : 0000000000000020
+[ 1943.243359]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000020
+[ 1943.243833]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003fcbb4de93
+[ 1943.244309]  s2 : 0000003fcbb4d6d8 s3 : 0000000000000002 s4 : 0000003fcbb4d6f0
+[ 1943.244794]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1943.329541]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1943.330023]  s11: 0000002acf8a49a0 t3 : 000000000000000b t4 : 0000003fcbb4de92
+[ 1943.330513]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1943.331002] status: 8000000200004220 badaddr: 00000000a4092077 cause: 0000000000000002
+[ 1943.332274] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a409 
+[ 1945.010184] edge_probe0[1020]: unhandled signal 4 code 0x1 at 0x00000000000105ae in edge_probe0[5ae,10000+6d000]
+[ 1945.011521] CPU: 0 UID: 0 PID: 1020 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1945.012323] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1945.012684] epc : 00000000000105ae ra : 0000000000010b12 sp : 0000003fd1b00040
+[ 1945.013180]  gp : 0000000000083058 tp : 000000002bf17780 t0 : 0000000000000020
+[ 1945.013672]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003fd1b000a0
+[ 1945.014154]  s1 : 0000000000000002 a0 : 0000000000000018 a1 : 0000000000000000
+[ 1945.014605]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000000
+[ 1945.076529]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003fd1b00e93
+[ 1945.077015]  s2 : 0000003fd1b003e8 s3 : 0000000000000002 s4 : 0000003fd1b00400
+[ 1945.077500]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1945.077973]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1945.078445]  s11: 0000002acf8a49a0 t3 : 000000000000000c t4 : 0000003fd1b00e92
+[ 1945.078935]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1945.079423] status: 8000000200004220 badaddr: 00000000a6092077 cause: 0000000000000002
+[ 1945.080685] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a609 
+[ 1946.792406] edge_probe0[1027]: unhandled signal 4 code 0x1 at 0x00000000000105ae in edge_probe0[5ae,10000+6d000]
+[ 1946.793761] CPU: 0 UID: 0 PID: 1027 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1946.794569] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1946.794935] epc : 00000000000105ae ra : 0000000000010b12 sp : 0000003fd58d9c20
+[ 1946.829367]  gp : 0000000000083058 tp : 000000002914b780 t0 : 0000000000000020
+[ 1946.829870]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003fd58d9c80
+[ 1946.830356]  s1 : 0000000000000002 a0 : 000000000000001a a1 : 0000000000000000
+[ 1946.830813]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000000
+[ 1946.831285]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003fd58dae93
+[ 1946.831763]  s2 : 0000003fd58d9fc8 s3 : 0000000000000002 s4 : 0000003fd58d9fe0
+[ 1946.832250]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1946.832724]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1946.833198]  s11: 0000002acf8a49a0 t3 : 000000000000000d t4 : 0000003fd58dae92
+[ 1946.833693]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1946.834184] status: 8000000200004220 badaddr: 00000000a6092077 cause: 0000000000000002
+[ 1946.912493] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a609 
+[ 1950.313756] edge_probe0[1041]: unhandled signal 4 code 0x1 at 0x00000000000105ae in edge_probe0[5ae,10000+6d000]
+[ 1950.326743] CPU: 0 UID: 0 PID: 1041 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1950.327557] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1950.327922] epc : 00000000000105ae ra : 0000000000010b12 sp : 0000003ff2b25f30
+[ 1950.328428]  gp : 0000000000083058 tp : 0000000001634780 t0 : 0000000000000020
+[ 1950.328923]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003ff2b25f90
+[ 1950.329412]  s1 : 0000000000000002 a0 : 000000000000001b a1 : 0000000000000020
+[ 1950.329872]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000020
+[ 1950.330348]  a5 : 0000000000000001 a6 : 0000000000000001 a7 : 0000003ff2b26e93
+[ 1950.330827]  s2 : 0000003ff2b262d8 s3 : 0000000000000002 s4 : 0000003ff2b262f0
+[ 1950.331318]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1950.331796]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1950.332274]  s11: 0000002acf8a49a0 t3 : 000000000000000f t4 : 0000003ff2b26e92
+[ 1950.332769]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1950.333262] status: 8000000200004220 badaddr: 00000000a6092077 cause: 0000000000000002
+[ 1950.334553] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a609 
+[ 1953.842299] edge_probe0[1055]: unhandled signal 4 code 0x1 at 0x00000000000105ae in edge_probe0[5ae,10000+6d000]
+[ 1953.843645] CPU: 0 UID: 0 PID: 1055 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1953.844451] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1953.844817] epc : 00000000000105ae ra : 0000000000010b12 sp : 0000003fd6e53200
+[ 1953.879344]  gp : 0000000000083058 tp : 000000002c2c1780 t0 : 0000000000000020
+[ 1953.879846]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003fd6e53260
+[ 1953.880330]  s1 : 0000000000000002 a0 : 0000000000000019 a1 : ffffffffffffffff
+[ 1953.880814]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000008
+[ 1953.881288]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003fd6e53e93
+[ 1953.881767]  s2 : 0000003fd6e535a8 s3 : 0000000000000002 s4 : 0000003fd6e535c0
+[ 1953.882254]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1953.882728]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1953.883203]  s11: 0000002acf8a49a0 t3 : 0000000000000011 t4 : 0000003fd6e53e92
+[ 1953.883699]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1953.884192] status: 8000000200004220 badaddr: 00000000a6092077 cause: 0000000000000002
+[ 1953.962459] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a609 
+[ 1955.629301] edge_probe0[1062]: unhandled signal 4 code 0x1 at 0x00000000000105ae in edge_probe0[5ae,10000+6d000]
+[ 1955.630643] CPU: 0 UID: 0 PID: 1062 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1955.631446] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1955.631807] epc : 00000000000105ae ra : 0000000000010b12 sp : 0000003ffb81daa0
+[ 1955.632303]  gp : 0000000000083058 tp : 000000001ab36780 t0 : 0000000000000020
+[ 1955.632794]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003ffb81db00
+[ 1955.633276]  s1 : 0000000000000002 a0 : 000000000000001f a1 : ffffffffffffffff
+[ 1955.633756]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000002
+[ 1955.634225]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003ffb81ee93
+[ 1955.634700]  s2 : 0000003ffb81de48 s3 : 0000000000000002 s4 : 0000003ffb81de60
+[ 1955.709919]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1955.710404]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1955.710877]  s11: 0000002acf8a49a0 t3 : 0000000000000012 t4 : 0000003ffb81ee92
+[ 1955.711372]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1955.711860] status: 8000000200004220 badaddr: 00000000a6092077 cause: 0000000000000002
+[ 1955.713116] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2077) a609 
+[ 1957.412834] edge_probe0[1069]: unhandled signal 4 code 0x1 at 0x00000000000106fa in edge_probe0[6fa,10000+6d000]
+[ 1957.414173] CPU: 0 UID: 0 PID: 1069 Comm: edge_probe0 Not tainted 7.4.0-rc3-zvk-dirty #3 PREEMPTLAZY 
+[ 1957.435613] Hardware name: karu64 VCU118 DDR RVA23S64 Zvk+Keccak NFS-root (DT)
+[ 1957.435995] epc : 00000000000106fa ra : 0000000000010b12 sp : 0000003fdbadaee0
+[ 1957.436493]  gp : 0000000000083058 tp : 0000000030aee780 t0 : 0000000000000020
+[ 1957.436984]  t1 : 0000000000082bc0 t2 : 0000000000000009 s0 : 0000003fdbadaf40
+[ 1957.437467]  s1 : 0000000000000002 a0 : 000000000000001b a1 : 0000000000000010
+[ 1957.437922]  a2 : 0000000000000100 a3 : 00000000000828c0 a4 : 0000000000000010
+[ 1957.438396]  a5 : 0000000000000000 a6 : 0000000000000000 a7 : 0000003fdbadbe93
+[ 1957.438871]  s2 : 0000003fdbadb288 s3 : 0000000000000002 s4 : 0000003fdbadb2a0
+[ 1957.439356]  s5 : 0000000000000002 s6 : 0000000000010492 s7 : 00000000000819f8
+[ 1957.439831]  s8 : 000000000000003a s9 : 000000000008b640 s10: 000000000000000f
+[ 1957.440303]  s11: 0000002acf8a49a0 t3 : 0000000000000013 t4 : 0000003fdbadbe92
+[ 1957.440798]  t5 : 0000000000000000 t6 : 1999999999999999 ssp : 0000000000000000
+[ 1957.441289] status: 8000000200004220 badaddr: 00000000a6092477 cause: 0000000000000002
+[ 1957.442572] Code: 9332 7807 e283 9332 7c07 e283 f757 80a5 1073 0088 (2477) a609 

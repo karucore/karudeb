@@ -1,0 +1,9 @@
+counter check: instret 4577183 over a 4000000-instruction probe (x1.14), 1032737000 ns
+  ** instret does not track retired instructions: this is not a hardware counter.
+  ** qemu-riscv64 answers every counter CSR from the host cpu's tick counter.
+  ** Run natively on the target; see `make count` for emulator measurement.
+
+op                cycles/op     insns/op     CPI        ns/op
+mlkem-encap         3732892       245237  15.222     49779000
+perf_user_cycle=9223372156848881312
+perf_user_instret=9223372049941382490

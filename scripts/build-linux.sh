@@ -44,7 +44,8 @@ need_cmd patch patch
 
 apply_linux_patches() {
   local patch_dirs=()
-  local patch_dir patch_file
+  local patch_dir patch_file patch_name
+  local -A patched_names=()
 
   if [[ -n "$LINUX_PATCH_DIR" ]]; then
     patch_dirs+=("$(abs_path "$LINUX_PATCH_DIR")")
@@ -56,6 +57,9 @@ apply_linux_patches() {
     [[ -d "$patch_dir" ]] || continue
     shopt -s nullglob
     for patch_file in "$patch_dir"/*.patch; do
+      # A version-specific patch replaces a generic patch with the same name.
+      patch_name="${patch_file##*/}"
+      [[ -z "${patched_names[$patch_name]:-}" ]] || continue
       if patch -d "$LINUX_SRC" -p1 --forward --dry-run <"$patch_file" >/dev/null; then
         info "Applying Linux patch: ${patch_file#$PROJECT_ROOT/}"
         patch -d "$LINUX_SRC" -p1 --forward <"$patch_file"
@@ -64,6 +68,7 @@ apply_linux_patches() {
       else
         die "Linux patch does not apply cleanly: $patch_file"
       fi
+      patched_names[$patch_name]=1
     done
     shopt -u nullglob
   done

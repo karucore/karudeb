@@ -518,6 +518,19 @@ The top-level `make clean` delegates to both trees.
 
 ## Kernel requirements
 
+The default kernel is **Linux 7.4-rc3**, a mainline release candidate, not a
+stable release. The builders fetch the exact `v7.4-rc3` tag from the upstream
+Torvalds Git repository and print its commit ID
+(`aebb7274476403040d582c61478df8f4a7bf9cd3`). RC downloads require `git`;
+stable `KERNEL_VERSION` overrides still use kernel.org tarballs with SHA-256
+verification. Git tag signatures are not verified automatically. Override
+`KERNEL_GIT_URL` for an RC mirror or `KERNEL_BASE_URL` for a stable mirror.
+
+The board kernel update does not require a new rootfs, OpenSBI, U-Boot or
+bitstream. Keep the served DTB identical to the ROM's DTB. Preserve the last
+working TFTP `Image` before replacing it, and validate the RC on the board
+before treating it as a release image.
+
 For initramfs-less NFS root, these pieces need to be built in, not modules:
 
 - ns16550/8250 serial console
@@ -540,8 +553,8 @@ The generated kernel image is usually:
 build/linux-riscv64/arch/riscv/boot/Image
 ```
 
-The QEMU wrapper fetches and verifies Linux 7.2.6 under
-`build/kernel-source/linux-7.2.6` if the source tree is missing.
+The QEMU wrapper fetches Linux 7.4-rc3 under
+`build/kernel-source/linux-7.4-rc3` if the source tree is missing.
 
 By default this builds only `Image`. Set `BUILD_TARGETS='Image modules dtbs'`
 if you also need a module tree or board DTBs.
@@ -882,6 +895,65 @@ build/karu64/opensbi/fw_jump.bin
 build/karu64/opensbi/fw_jump.elf
 ```
 
+The default is **OpenSBI v1.9** (`OPENSBI_REF`). The build checks the
+source against that reference before it compiles, because an existing
+checkout is reused:
+
+- the managed clone under `build/karu64/src/opensbi` is switched to the
+  requested tag, and its object directory is discarded. The clone is
+  recognised by its resolved location, so a relative `SRC_DIR` or a symlink
+  on the way does not turn it into an external tree;
+- a tree given through `OPENSBI_SRC` is never modified, and a different
+  version there is an error. Git identifies the checkout, so worktrees and
+  submodules are checked like plain clones;
+- a source without Git metadata cannot be checked and is refused unless
+  `OPENSBI_ALLOW_UNVERSIONED=1` is set.
+
+`make karu-opensbi-check` tests these rules offline against small fixture
+repositories (`tests/test_opensbi_source.py`); it needs no cross compiler
+and does not touch `build/karu64`.
+
+The profile device tree (`configs/karu64-zvk-nfsroot-ddr.dts`, which the
+RVA23S64 tree includes) describes the processor's system-control register
+with a `syscon@10000800` node and a `reboot` node. OpenSBI's generic
+`syscon-reboot` driver uses them to implement SBI system reset, which is
+how Linux and U-Boot reboot the board. Only debug-enabled VCU118 images
+built from 2026-11-17 on implement the register. On an earlier image
+OpenSBI lists the reboot device but the write has no effect, and a reboot
+request halts as before. See the status note under
+[Linux 7.4](#linux-74-kernel-aes).
+
+A second profile tree, `configs/karu64-rva23s64-zkr-nfsroot-ddr.dts`
+(`DTB_VARIANT=rva23s64-zkr-ddr`; `make karu64-rva23s64-zkr-dtb` builds it
+and `make karu64-rva23s64-zkr-tftp` stages it), adds
+`zkr` to the ISA properties and nothing else. It is only for karu64 images
+built with `KARU_ZKR`: OpenSBI then enables S-mode access to the `seed` CSR
+and Linux reads it for early randomness. On any other image those accesses
+trap, so the plain `rva23s64-ddr` tree stays the default here, and it is also
+the one to serve when Linux should leave `seed` alone. The kernel is the
+same for both. karu64 checks at image build time that the tree and the
+image agree. karu64's default VCU118 debug image has been built with
+`KARU_ZKR` since 2026-11-17, so that image needs this tree and its staged
+boot command; karu64's profile image without debug still takes the plain
+one.
+
+The Zkr variant is staged with `random.trust_cpu=off` in its kernel command
+line: the entropy source has not been characterised, so Linux mixes what
+`seed` delivers into its pool without counting it as entropy. Pass
+`BOOTARGS` to choose otherwise. The command line is part of the boot
+command baked into the ROM's U-Boot, so it belongs to the image.
+
+**Keep each bitstream with its own tree.** Serving the Zkr tree to an image
+without the CSRs, such as `d5e603cd…` or `0b994847…`, makes Linux execute a
+`seed` access that the hardware answers with an illegal-instruction
+exception, early in boot and with no fallback.
+
+OpenSBI and the device tree it reads are part of the bitstream's boot ROM.
+Restaging the TFTP files does not update either of them: a board gets
+OpenSBI v1.9 and the reboot nodes only with a bitstream whose ROM was built
+from them. Deploy the staged `Image` and `board.dtb` together with that
+bitstream.
+
 The ROM bitstream targets should source that shared `fw_jump.bin`, then select
 only the DTB and netboot command per hardware variant:
 
@@ -890,9 +962,11 @@ Reduced IMAC ROM DTB: build/karu64/karu64-rv64imac-ddr.dtb
 RV64GC ROM DTB:       build/karu64/karu64-rv64gc-ddr.dtb
 RVA23/Zvk ROM DTB:    build/karu64/karu64-zvk-ddr.dtb
 RVA23S64 ROM DTB:     build/karu64/karu64-rva23s64-ddr.dtb
+RVA23S64+Zkr ROM DTB: build/karu64/karu64-rva23s64-zkr-ddr.dtb
 RV64GC netboot:       build/karu64/tftp/rv64gc-ddr/uboot-netboot-one-line.txt
 RVA23/Zvk netboot:    build/karu64/tftp/zvk-ddr/uboot-netboot-one-line.txt
 RVA23S64 netboot:     build/karu64/tftp/rva23s64-ddr/uboot-netboot-one-line.txt
+RVA23S64+Zkr netboot: build/karu64/tftp/rva23s64-zkr-ddr/uboot-netboot-one-line.txt
 ```
 
 These files are read on the host that builds the bitstream, which need not be
@@ -981,9 +1055,15 @@ measurement target. On a validated full-vector board run, the live kernel
 reported `riscv-pmu-sbi: 16 firmware and 31 hardware counters`, and
 `perf_run --user-count` worked for both `root` and `karu`.
 
-That only holds with `patches/linux/0001-riscv-pmu-keep-fixed-counters-usable-for-benchmarks.patch`
-applied. The karu64 ROM device tree has no `pmu` node, so OpenSBI 1.8.1 has an
-empty hardware event map and its SBI 3.0 `PMU_EVENT_GET_INFO` call reports even
+That requires the karudeb
+`0001-riscv-pmu-keep-fixed-counters-usable-for-benchmarks.patch`.
+Linux 7.4-rc3 uses the forward port in `patches/linux-7.4-rc3/`, adapted to
+multiword counter bitmaps and variadic SBI calls. A version-specific patch
+replaces the same-named generic patch in `patches/linux/`; other generic
+patches still apply. The karu64 ROM device tree has no `pmu` node, so
+OpenSBI 1.8.1 (the version in the ROM when this was tested; not rechecked
+with v1.9) has an empty hardware event map and its SBI 3.0
+`PMU_EVENT_GET_INFO` call reports even
 the mandatory cycle and instret events as unsupported once the hart advertises
 Sscofpmf. An unpatched kernel then marks both perf events `-ENOENT` at probe,
 `perf_event_open` for cycles or instructions fails, and the fixed counters the
@@ -1008,8 +1088,8 @@ and sim DTBs advertise the default full-vector karu64 profile:
   advertised so hwprobe consumers can select the implemented subset paths)
 
 The legacy `riscv,isa` string also carries `zvl256b` for tools that consume it.
-Linux 7.2.6 does not accept `zvl*` in `riscv,isa-extensions`; it probes the
-actual vector length from the vector CSRs. The default DTBs intentionally do not
+Linux probes the actual vector length from the vector CSRs.
+The default DTBs intentionally do not
 advertise M-mode pointer masking `smmpm`, optional crypto leaves beyond `zvkb`,
 DIEL assertions `zkt`/`zvkt`, full `zvfh`, or `zvbc`.
 
@@ -1017,9 +1097,9 @@ The `zvk-ddr` DTB variant additionally advertises the implemented standard Zvk l
 (`zvkg`, `zvkned`, `zvknha`, `zvknhb`, `zvksed`, `zvksh`, in addition to the
 default `zvbb`/`zvkb`) plus the scalar and vector data-independent execution
 latency assertions `zkt` and
-`zvkt`, and `smcntrpmf`/`sscofpmf`. Linux 7.2.6 uses `sscofpmf` for PMU
-overflow support and silently ignores the `smcntrpmf` token; OpenSBI consumes
-the same structured list and probes the CSRs before programming counter
+`zvkt`, and `smcntrpmf`/`sscofpmf`. Linux uses `sscofpmf` for PMU
+overflow support and, since 7.3, recognizes the `smcntrpmf` token (7.2 ignored
+it). OpenSBI consumes the same structured list and probes the CSRs before programming counter
 filters for perf events such as `instructions:u`.
 Check the live tokens in `/proc/device-tree/cpus/cpu@0/riscv,isa-extensions`
 after a boot; source edits alone do not update the ROM copy or the separately
@@ -1082,6 +1162,139 @@ The profile kernel merges the existing Zvk NFS-root fragment with the small
 builder accepts an optional `EXTRA_FRAGMENT` after its base fragment, so the
 network/driver configuration is shared instead of copied.
 
+#### Linux 7.4 kernel AES
+
+The Zvk and RVA23S64 kernels enable built-in AES ECB, CBC/CBC-CTS, CTR and
+XTS plus registration-time crypto known-answer self-tests. Linux 7.4 moved
+the RISC-V accelerated modes into `lib/crypto/riscv/`; the old
+`CONFIG_CRYPTO_AES_RISCV64` switch no longer exists. `CONFIG_CRYPTO_AES` and
+the selected modes pull in `CONFIG_CRYPTO_LIB_AES_ARCH` and the mode
+libraries. Runtime dispatch checks Zvkned, with Zvkb needed for CTR and
+Zvbb/Zvkg for XTS. Karu's VLEN=256 meets these paths' vector-length limits.
+See the [upstream crypto changes](https://lkml.iu.edu/hypermail/linux/kernel/2610.2/05545.html).
+
+These implementations require
+`CONFIG_RISCV_EFFICIENT_VECTOR_UNALIGNED_ACCESS=y`, now set for the vector
+board profile because its vector LSU handles unaligned RAM accesses in
+hardware. This is a build-time assumption, not a measured performance
+claim; do not reuse the profile on hardware that traps these accesses.
+Vectorized usercopy remains effectively disabled by the existing high
+threshold. Deprecated AF_ALG userspace interfaces remain disabled.
+This does not change OpenSSL's own userspace dispatch or benchmark paths.
+
+Build and check the merged configuration without touching the live server:
+
+```sh
+make karu64-rva23s64-linux
+python3 tests/test_fetch_linux.py
+python3 tests/test_karu64_profile.py --linux-src build/kernel-source/linux-7.4-rc3
+```
+
+On 2026-11-17 this image built successfully with clang 24, passed all 24
+fetch/profile/Kconfig checks, and booted a BusyBox initramfs under QEMU
+11.1.2 with VLEN=256 and Zvkned/Zvkb/Zvbb/Zvkg enabled. The AES modes above
+reported `selftest : passed`, and `/dev/kvm` was present. The patched Git
+source produces kernel release `7.4.0-rc3-zvk-dirty`; the suffix is expected.
+
+The same image subsequently **passed VCU118 lab acceptance** on the
+existing debug-enabled bitstream: NFS/SSH, 256 MiB DDR patterns, user-only
+counters, crypto known answers, cache/vector checks and KVM API creation.
+The vector ptrace suite reported 13 passes and six expected skips, with no
+failures. All seven kernel AES registrations passed self-tests; the
+Keccak encoding sweep passed 20/20. See the
+[2026-11-17 acceptance record and raw logs](doc/kernel-7.4-rc3-20261117.md).
+KVM guest execution was not tested. Autonomous software reboot is
+unavailable on the board image that was tested (bitstream `0b994847…`): its
+hardware has no reset device, and the reported restart needed a
+debug-module reset.
+
+*Status, 2026-11-17.* Software reboot has since been implemented; it passed
+on the board on 2026-11-18 (below). The processor gained a system-control reset register,
+the profile device tree describes it, and OpenSBI moved to v1.9. In
+simulation the boot ROM, OpenSBI v1.9 and an S-mode payload reboot the
+system through SBI system reset and boot a second time. The karu64 debug
+bitstream `d5e603cd…fd9b2`, built on 2026-11-17, has them: its ROM holds
+OpenSBI v1.9 (`cbbbe5ce…`) and the device tree `c477784a…`, which is also
+the staged `board.dtb`. That bitstream has not been programmed or tested on
+a board yet, so the acceptance result above stands
+unchanged for the tested image.
+
+*Status, 2026-11-18.* A further karu64 debug bitstream, `d7ff00dc…3e80`,
+adds the Zkr entropy source, debug authentication and a 2 MiB boot ROM. Its
+ROM holds OpenSBI v1.9 (`cbbbe5ce…`) and the Zkr device tree `784e2762…`
+(`rva23s64-zkr-ddr`), which is the file to serve as `board.dtb` with it, and
+its baked boot command carries `random.trust_cpu=off`. Do not serve the Zkr
+tree to `d5e603cd…` or any earlier bitstream.
+
+*Status, 2026-11-18, board.* `d7ff00dc…3e80` **passed the VCU118 board
+session** with the accepted kernel `3b45e852…` (`7.4.0-rc3-zvk-dirty`) and
+the Zkr tree `784e2762…` served as `board.dtb`, following karu64's
+`dbg/BOARD_TEST_PLAN.md`; the record is karu64's
+`dbg/BOARD_ACCEPTANCE-2026-11-18.md`. For this repository that shows:
+- OpenSBI v1.9 from the ROM finds `zkr` and the `syscon-reboot` device, and
+  Linux lists `zkr` in the device tree and `/proc/cpuinfo`, with no
+  archrandom error; with the entropy source held off by its switch, the
+  boot does not depend on it;
+- software reboot works: eight reboots, each back through the boot ROM and
+  OpenSBI;
+- `board_accept.sh --expect-kernel 7.4.0-rc3-zvk-dirty` passes, as do the
+  KVM `ebreak_test` and `arch_timer`, the vector ptrace and state selftests
+  built from 7.4-rc3 (`build/selftests-7.4-rc3`), riscv-pqc `xtest` and all
+  92 OpenSSL Zvk known-answer pairs.
+
+A boot takes about 4.5 minutes to the login prompt, and an SSH connection
+to the board 30 to 55 s. U-Boot prints "No RNG device" before booting:
+its Zkr driver is deliberately not built, so it finds no RNG for
+`kaslr-seed`; this is harmless. The plain `c477784a…` tree was staged as a
+fallback and not needed.
+
+**The kernel staged on the build host is not the accepted one.** The
+`Image` that `make karu64-rva23s64-tftp` and `make karu64-rva23s64-zkr-tftp`
+stage from this checkout on the bitstream build host is
+`b0295cd6…ad4c`, release `7.4.0-rc3-zvk`, built with clang 22.1.8. The
+image that passed lab acceptance is `3b45e852…8843`, release
+`7.4.0-rc3-zvk-dirty`, built with clang 24. They are different binaries
+from the same configuration. A bitstream does not contain a kernel, so a
+new bitstream is tested with the lab's accepted `Image` and the device tree
+that belongs to that bitstream. If the build host's `Image` is served
+instead, it is a new kernel under test: `board_accept.sh --expect-kernel
+7.4.0-rc3-zvk-dirty` fails on its release string, as it should, and the
+acceptance record above does not cover it.
+
+Use the ROM DTB override in [Bitstream built on another host](#bitstream-built-on-another-host)
+when staging. After boot, check `uname -r`, inspect `/proc/crypto` for the
+AES modes and `selftest : passed`, and check `dmesg` for crypto self-test
+failures. Registration alone does not prove which runtime branch ran; the
+assembly is selected using the advertised ISA and SIMD availability.
+Run `sudo board_accept.sh --expect-kernel 7.4.0-rc3-zvk-dirty` as the full board
+regression, including vector ABI and user-only counter checks. The existing
+userspace crypto KATs do not substitute for kernel AES tests.
+Ensure `validate_v_ptrace` is executable in `PATH` or under
+`/root/selftests/riscv/vector/` when running from `/root`: it is not installed
+by the rootfs builder, and an absent binary is silently skipped by the
+board script. The acceptance record describes the 7.4-rc3 build used here.
+
+For a kernel-only trial on an already configured server, after local staging
+with the matching ROM DTB, preserve the old kernel and replace only `Image`:
+
+```sh
+cmp build/karu64/tftp/rva23s64-ddr/board.dtb /srv/tftp/board.dtb
+sudo cp -an /srv/tftp/Image /srv/tftp/Image.before-7.4-rc3
+sudo install -m 0644 build/karu64/tftp/rva23s64-ddr/Image /srv/tftp/Image.next
+sudo mv /srv/tftp/Image.next /srv/tftp/Image
+```
+
+With a karu64 image built with `KARU_ZKR` on the board, compare against
+`build/karu64/tftp/rva23s64-zkr-ddr/board.dtb` instead; the `Image` is the
+same file in both staging directories.
+
+The new kernel is fetched on the next board boot; no service restart is
+needed. To roll back, restore `/srv/tftp/Image.before-7.4-rc3` as
+`/srv/tftp/Image` before booting again. Do not replace the NFS root or DTB
+for this kernel-only update.
+
+#### Build and stage
+
 ```sh
 make karu64-rva23s64-check
 make karu-opensbi
@@ -1093,15 +1306,21 @@ TFTP_SERVER=192.168.42.1 GUEST_IP=192.168.42.10 \
 Use `KERNEL_VERSION`/`LINUX_SRC` to select a different supported kernel as
 with the existing builder. Staging defaults remain configurable; the example
 uses the VCU118 lab network. Without `TFTP_ROOT`, staging writes only
-`build/karu64/tftp/rva23s64-ddr/`, not the active TFTP service.
+`build/karu64/tftp/rva23s64-ddr/`, not the active TFTP service. For a karu64
+image built with `KARU_ZKR`, which includes its default debug image, use
+`make karu64-rva23s64-zkr-tftp` instead: it stages
+`build/karu64/tftp/rva23s64-zkr-ddr/` with `karu64-rva23s64-zkr-ddr.dtb`.
 
 Outputs are `build/linux-riscv64-karu64-rva23s64/arch/riscv/boot/Image`,
 `build/karu64/karu64-rva23s64-ddr.dtb`, and the profile staging directory.
-The staged `board.dtb` must remain byte-identical to the DTB packed in ROM.
-In the processor repository, `make rva23-boot-inputs-check` checks that
-identity and required boot-discovery leaves before
-`make vcu118-ddr-sgmii-rom-rva23s64` reuses the 75 MHz vector ROM flow.
-OpenSBI v1.8.1 already initializes state-enable and Sstc controls; the
+The staged `board.dtb` must remain byte-identical to the DTB packed in ROM;
+the one deliberate exception is serving the plain tree to a Zkr image, as
+described above. In the processor repository, `make rva23-boot-inputs-check`
+checks that identity, the required boot-discovery leaves and that `zkr` is in
+the tree exactly when the image has it, before
+`make vcu118-ddr-sgmii-rom-rva23s64` reuses the 75 MHz vector ROM flow. The
+debug target there runs the same check on the tree of its own variant.
+OpenSBI v1.9 already initializes state-enable and Sstc controls; the
 Svpbmt DT advertisement also enables its PBMTE initialization.
 
 When transferring the build to an FPGA-connected system, keep the bitstream
@@ -1121,7 +1340,9 @@ checkouts of this repository:
 
 - The **bitstream build host** bakes OpenSBI, U-Boot with its boot command,
   and the control DTB into the ROM. The boot command is its own
-  `build/karu64/tftp/rva23s64-ddr/uboot-netboot-one-line.txt`, so that host
+  `build/karu64/tftp/<variant>/uboot-netboot-one-line.txt`, where the
+  variant is `rva23s64-ddr`, or `rva23s64-zkr-ddr` for an image built with
+  `KARU_ZKR`. That host
   must stage with the lab addresses although it serves nothing. The staging
   defaults (`192.168.1.20` / `192.168.1.10`) are not the lab network.
 - The **board host** serves `Image` and `board.dtb` from its TFTP root and the
@@ -1143,7 +1364,7 @@ processor checkout the bundle was extracted in:
 DTB=$KARU64/_build/vcu118_rom_board.dtb \
   TFTP_SERVER=192.168.42.1 GUEST_IP=192.168.42.10 \
   NFS_SERVER=192.168.42.1 NFSROOT=/srv/nfs/karudeb TFTP_ROOT=/srv/tftp \
-  make karu64-rva23s64-tftp
+  make karu64-rva23s64-tftp        # karu64-rva23s64-zkr-tftp for a Zkr image
 sha256sum /srv/tftp/board.dtb
 ```
 
@@ -1153,9 +1374,10 @@ serves the given file instead of the one it compiles, so this holds by
 construction.
 
 `make karu64-rva23s64-check` is a separate source check. It recompiles the
-DTS with the local `dtc` and prints `profile DTB sha256=...` for that fresh
-compile. A match with the manifest means this checkout and `dtc` reproduce
-the ROM DTB. A mismatch means the checkout or the `dtc` differs from the
+device trees with the local `dtc` and prints `profile DTB sha256=...` for
+the plain tree and `zkr profile DTB sha256=...` for the Zkr variant. A match
+of the image's variant with the manifest means this checkout and `dtc`
+reproduce the ROM DTB. A mismatch means the checkout or the `dtc` differs from the
 build host's, and copying a DTB cannot change what the check prints. It does
 not block booting while the served file is the bundled one, but a locally
 compiled DTB must not be served until the difference is understood.
@@ -1212,7 +1434,8 @@ leaves against the DTB, KVM VM/vCPU creation, memory, the benchmark counters,
 the crypto known answers, and the vector ABI and cache-coverage regressions
 (`vill_probe` must pass all six `vsetvl` encodings, `cache_window_probe` must
 see equal fetch and load cost on both sides of the 256 MiB boundary,
-`validate_v_ptrace` must pass 6/6). It also reports `fp_probe`'s scalar FP
+`validate_v_ptrace` must have no failures, with skips and case counts
+recorded for the particular selftest version). It also reports `fp_probe`'s scalar FP
 cycle costs, which are informational but recorded per bitstream, and runs
 `xtest` when one is present. The rootfs builder installs the script, its
 helper and the probes from `tools/`.
@@ -1246,7 +1469,7 @@ make karu-rv64imac-tftp
 
 The configuration sources are:
 
-- `configs/linux-riscv64-karu64-rv64imac.fragment` for Linux 7.2.6 with
+- `configs/linux-riscv64-karu64-rv64imac.fragment` for Linux 7.4-rc3 with
   `CONFIG_FPU` off and the built-in LiteEth driver.
 - `configs/busybox-karu64-rv64imac.fragment` for static rv64imac/lp64
   BusyBox plus basic network applets.

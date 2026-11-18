@@ -97,6 +97,20 @@
 			reg-io-width = <0x01>;
 		};
 
+		/*
+		 * System control register, in the upper half of the UART's page.
+		 * A 32-bit write of 0x7777 resets the hart and the SoC peripherals
+		 * and restarts from the boot ROM; DDR calibration, DRAM contents
+		 * and the debug module survive. OpenSBI's generic syscon-reboot
+		 * driver uses it to implement SBI system reset. Debug-enabled
+		 * VCU118 images built from 2026-11-17 implement it; earlier images
+		 * ignore the write, and a reset request then halts as before.
+		 */
+		sysctl: syscon@10000800 {
+			compatible = "karu,karu64-sysctl", "syscon";
+			reg = <0x00 0x10000800 0x00 0x00000100>;
+		};
+
 		ethernet@11001000 {
 			compatible = "litex,liteeth";
 			reg = <0x00 0x11001000 0x00 0x0000007c>,
@@ -110,5 +124,12 @@
 			interrupt-parent = <&plic>;
 			interrupts = <0x02>;
 		};
+	};
+
+	reboot {
+		compatible = "syscon-reboot";
+		regmap = <&sysctl>;
+		offset = <0x00>;
+		value = <0x7777>;
 	};
 };

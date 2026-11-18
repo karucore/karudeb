@@ -32,6 +32,10 @@ case "$DTB_VARIANT" in
     DTB_VARIANT="rva23s64-ddr"
     DTB_ADDR="${DTB_ADDR:-0x84000000}"
     ;;
+  rva23s64-zkr|rva23s64-zkr-ddr)
+    DTB_VARIANT="rva23s64-zkr-ddr"
+    DTB_ADDR="${DTB_ADDR:-0x84000000}"
+    ;;
   zvk|zvk-ddr|vector-crypto|vector-crypto-ddr)
     DTB_VARIANT="zvk-ddr"
     DTB_ADDR="${DTB_ADDR:-0x84000000}"
@@ -49,13 +53,13 @@ case "$DTB_VARIANT" in
     DTB_ADDR="${DTB_ADDR:-0x81300000}"
     ;;
   *)
-    die "DTB_VARIANT must be 'rva23s64-ddr', 'zvk-ddr', 'rv64gc-ddr', 'ddr', or 'sim'"
+    die "DTB_VARIANT must be 'rva23s64-ddr', 'rva23s64-zkr-ddr', 'zvk-ddr', 'rv64gc-ddr', 'ddr', or 'sim'"
     ;;
 esac
 
 if [[ -z "$KERNEL" ]]; then
   case "$DTB_VARIANT" in
-    rva23s64-ddr)
+    rva23s64-ddr|rva23s64-zkr-ddr)
       KERNEL="$PROJECT_ROOT/build/linux-riscv64-karu64-rva23s64/arch/riscv/boot/Image"
       ;;
     rv64gc-ddr)
@@ -75,6 +79,12 @@ if [[ -z "$OUT_DIR" ]]; then
 fi
 
 DEFAULT_BOOTARGS="console=ttyS0,115200 earlycon root=/dev/nfs rw ip=$GUEST_IP:$NFS_SERVER:$GATEWAY_IP:$NETMASK:$KARUDEB_HOSTNAME:eth0:off nfsroot=$NFS_SERVER:$NFSROOT,$NFS_OPTS"
+# The Zkr variant's entropy source has not been characterised. Linux mixes
+# what seed delivers into its pool either way; random.trust_cpu=off keeps it
+# from counting those words as entropy. Give BOOTARGS to decide otherwise.
+if [[ "$DTB_VARIANT" == "rva23s64-zkr-ddr" ]]; then
+  DEFAULT_BOOTARGS="$DEFAULT_BOOTARGS random.trust_cpu=off"
+fi
 BOOTARGS="${BOOTARGS:-$DEFAULT_BOOTARGS}"
 if [[ -n "${APPEND_EXTRA:-}" ]]; then
   BOOTARGS="$BOOTARGS $APPEND_EXTRA"
