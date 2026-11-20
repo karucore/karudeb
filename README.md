@@ -1196,57 +1196,39 @@ fetch/profile/Kconfig checks, and booted a BusyBox initramfs under QEMU
 reported `selftest : passed`, and `/dev/kvm` was present. The patched Git
 source produces kernel release `7.4.0-rc3-zvk-dirty`; the suffix is expected.
 
-The same image subsequently **passed VCU118 lab acceptance** on the
-existing debug-enabled bitstream: NFS/SSH, 256 MiB DDR patterns, user-only
-counters, crypto known answers, cache/vector checks and KVM API creation.
-The vector ptrace suite reported 13 passes and six expected skips, with no
-failures. All seven kernel AES registrations passed self-tests; the
-Keccak encoding sweep passed 20/20. See the
-[2026-11-17 acceptance record and raw logs](doc/kernel-7.4-rc3-20261117.md).
-KVM guest execution was not tested. Autonomous software reboot is
-unavailable on the board image that was tested (bitstream `0b994847…`): its
-hardware has no reset device, and the reported restart needed a
-debug-module reset.
-
-*Status, 2026-11-17.* Software reboot has since been implemented; it passed
-on the board on 2026-11-18 (below). The processor gained a system-control reset register,
-the profile device tree describes it, and OpenSBI moved to v1.9. In
-simulation the boot ROM, OpenSBI v1.9 and an S-mode payload reboot the
-system through SBI system reset and boot a second time. The karu64 debug
-bitstream `d5e603cd…fd9b2`, built on 2026-11-17, has them: its ROM holds
-OpenSBI v1.9 (`cbbbe5ce…`) and the device tree `c477784a…`, which is also
-the staged `board.dtb`. That bitstream has not been programmed or tested on
-a board yet, so the acceptance result above stands
-unchanged for the tested image.
-
-*Status, 2026-11-18.* A further karu64 debug bitstream, `d7ff00dc…3e80`,
-adds the Zkr entropy source, debug authentication and a 2 MiB boot ROM. Its
-ROM holds OpenSBI v1.9 (`cbbbe5ce…`) and the Zkr device tree `784e2762…`
-(`rva23s64-zkr-ddr`), which is the file to serve as `board.dtb` with it, and
-its baked boot command carries `random.trust_cpu=off`. Do not serve the Zkr
-tree to `d5e603cd…` or any earlier bitstream.
-
-*Status, 2026-11-18, board.* `d7ff00dc…3e80` **passed the VCU118 board
-session** with the accepted kernel `3b45e852…` (`7.4.0-rc3-zvk-dirty`) and
-the Zkr tree `784e2762…` served as `board.dtb`, following karu64's
+The same image passes VCU118 lab acceptance with karu64's current debug
+bitstream, `ddb168e1…`, and the Zkr device tree `784e2762…`
+(`rva23s64-zkr-ddr`) served as `board.dtb`, following karu64's
 `dbg/BOARD_TEST_PLAN.md`; the record is karu64's
-`dbg/BOARD_ACCEPTANCE-2026-11-18.md`. For this repository that shows:
+`dbg/BOARD_ACCEPTANCE-2026-11-20.md`. For this repository that shows:
 - OpenSBI v1.9 from the ROM finds `zkr` and the `syscon-reboot` device, and
   Linux lists `zkr` in the device tree and `/proc/cpuinfo`, with no
   archrandom error; with the entropy source held off by its switch, the
   boot does not depend on it;
-- software reboot works: eight reboots, each back through the boot ROM and
-  OpenSBI;
+- U-Boot v2026.10 in the ROM reads `seed` and puts a `kaslr-seed` into
+  `/chosen`, the seed of the kernel's address randomization; with the
+  source off it prints "No RNG device" and boots on. Separately, the boot
+  command's `random.trust_cpu=off` keeps Linux from crediting what it reads
+  from `seed` itself, as a CPU random-number source, as entropy for its
+  pool;
+- software reboot works, each reboot back through the boot ROM and OpenSBI
+  (one boot in that session froze after a host-side console port hand-over;
+  the record has the details);
 - `board_accept.sh --expect-kernel 7.4.0-rc3-zvk-dirty` passes, as do the
   KVM `ebreak_test` and `arch_timer`, the vector ptrace and state selftests
   built from 7.4-rc3 (`build/selftests-7.4-rc3`), riscv-pqc `xtest` and all
   92 OpenSSL Zvk known-answer pairs.
 
+The kernel's own acceptance, with raw logs, is in
+[doc/kernel-7.4-rc3-20261117.md](doc/kernel-7.4-rc3-20261117.md): the
+vector ptrace suite reported 13 passes and six expected skips, with no
+failures; all seven kernel AES registrations passed self-tests; the Keccak
+encoding sweep passed 20/20. Do not serve the Zkr tree to a bitstream
+without the Zkr CSRs (`d5e603cd…`, `0b994847…` and older): Linux would
+execute a `seed` access that traps.
+
 A boot takes about 4.5 minutes to the login prompt, and an SSH connection
-to the board 30 to 55 s. U-Boot prints "No RNG device" before booting:
-its Zkr driver is deliberately not built, so it finds no RNG for
-`kaslr-seed`; this is harmless. The plain `c477784a…` tree was staged as a
-fallback and not needed.
+to the board 30 to 55 s.
 
 **The kernel staged on the build host is not the accepted one.** The
 `Image` that `make karu64-rva23s64-tftp` and `make karu64-rva23s64-zkr-tftp`
